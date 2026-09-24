@@ -40,7 +40,7 @@ GitHub Pages (web/)  ──►  Supabase
 ## Colocar no ar
 
 Siga **[docs/CONFIGURAR.md](docs/CONFIGURAR.md)** (≈15 min) e depois **[docs/INTEGRACOES.md](docs/INTEGRACOES.md)** para cada plataforma.
-A publicação é automática: todo `git push` na `main` atualiza o site (GitHub Pages) e, quando `supabase/` muda, o banco e as funções.
+O site é publicado na branch `gh-pages` com `sh ops/publicar-site.sh`. Banco e funções são publicados pelo workflow em `ops/github-workflows/` (ativação no passo 3 do guia).
 
 ## Rodar no computador
 
@@ -58,10 +58,10 @@ npm run check      # sintaxe dos scripts
 | `web/features.js` | Integrações, entradas e saídas, produtos, estados, CRM, conciliação em lote, navegação por `#pagina` |
 | `web/assistant.js` | Painel do assistente e execução das ferramentas da IA |
 | `web/cloud.js` | Login, carga do workspace e gravação incremental no Supabase |
-| `web/config.js` | Gerado na publicação (URL e chave pública do Supabase) |
+| `web/config.js` | URL e chave pública do Supabase (vazio = modo local) |
 | `supabase/migrations/` | Esquema, RLS e funções SQL |
 | `supabase/functions/_shared/` | Conectores Bling, Mercado Livre, Shopee, Magalu e gravação com mesclagem segura |
 | `supabase/functions/ai-assistant/prompt.ts` | Prompt e ferramentas do assistente (espelhados em `web/assistant.js`) |
-| `.github/workflows/` | Publicação do site, do Supabase e verificação |
+| `ops/` | Publicação do site (`publicar-site.sh`) e workflows do GitHub Actions (Supabase e verificação) |
 
 Regras para quem (humano ou IA) for alterar o código: **[AGENTS.md](AGENTS.md)**.

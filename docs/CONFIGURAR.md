@@ -1,6 +1,6 @@
 # Configurar a nuvem (Supabase + IA)
 
-O site já está publicado no GitHub Pages em **modo local**. Estes passos ligam o modo nuvem: login, dados compartilhados entre computadores, integrações automáticas e o assistente de IA. Tudo é gratuito, exceto o consumo da IA (pago por uso na Anthropic).
+O site já está publicado no GitHub Pages (https://guilhermek-maker.github.io/concil-ia/) em **modo local**. Estes passos ligam o modo nuvem: login, dados compartilhados entre computadores, integrações automáticas e o assistente de IA. Tudo é gratuito, exceto o consumo da IA (pago por uso na Anthropic).
 
 > Nenhum destes passos pode ser feito pela IA por você: envolvem criar contas e copiar chaves secretas. Leva cerca de 15 minutos.
 
@@ -19,7 +19,17 @@ O site já está publicado no GitHub Pages em **modo local**. Estes passos ligam
 2. **API Keys › Create Key**. Copie a chave (`sk-ant-...`).
 3. Recomendado: defina um limite mensal de gasto em **Limits** no console da Anthropic.
 
-## 3. Cadastrar no GitHub
+## 3. Ativar a publicação automática do Supabase (uma vez)
+
+O workflow que cria as tabelas e publica as funções está em `ops/github-workflows/`. O GitHub só aceita arquivos de workflow enviados por um login com o escopo `workflow`. No terminal, na pasta do projeto:
+
+```bash
+gh auth refresh -h github.com -s workflow
+```
+
+Aprove no navegador e depois peça ao Claude: **"ative os workflows do CONCIL-IA"** (ou rode `git mv ops/github-workflows .github/workflows`, faça o commit e o push).
+
+## 4. Cadastrar segredos e variáveis no GitHub
 
 No repositório: **Settings › Secrets and variables › Actions**.
 
@@ -27,8 +37,6 @@ No repositório: **Settings › Secrets and variables › Actions**.
 
 | Nome | Valor |
 |---|---|
-| `SUPABASE_URL` | `https://<REF>.supabase.co` |
-| `SUPABASE_ANON_KEY` | chave anon/publishable |
 | `SUPABASE_PROJECT_REF` | `<REF>` |
 | `AI_MODEL` *(opcional)* | padrão `claude-opus-5` |
 | `AI_EFFORT` *(opcional)* | `low`, `medium` (padrão) ou `high` |
@@ -41,17 +49,26 @@ No repositório: **Settings › Secrets and variables › Actions**.
 | `SUPABASE_ACCESS_TOKEN` | token do passo 1.4 |
 | `SUPABASE_DB_PASSWORD` | senha do banco do passo 1.2 |
 | `ANTHROPIC_API_KEY` | chave do passo 2 |
-| `OAUTH_STATE_SECRET` | qualquer texto aleatório longo (ex.: gere em https://www.random.org/strings) |
-| `CRON_SECRET` *(opcional)* | texto aleatório, só se for usar a sincronização agendada (passo 6) |
+| `OAUTH_STATE_SECRET` | qualquer texto aleatório longo |
+| `CRON_SECRET` *(opcional)* | texto aleatório, só para a sincronização agendada (passo 7) |
 
 As credenciais das plataformas (Bling, Mercado Livre, Shopee, Magalu) entram aqui também — veja [INTEGRACOES.md](INTEGRACOES.md).
 
-## 4. Publicar
+Depois: **Actions › Publicar banco e funções (Supabase) › Run workflow**. Ele cria as tabelas, envia os segredos e publica as funções.
 
-**Actions › Publicar banco e funções (Supabase) › Run workflow** e depois **Actions › Publicar site (GitHub Pages) › Run workflow**.
-O primeiro cria as tabelas, cadastra os segredos e publica as funções; o segundo gera o `config.js` do site com a URL do Supabase.
+> Sem GitHub Actions, dá para publicar do seu computador com o Supabase CLI: `supabase link --project-ref <REF>`, `supabase db push`, `supabase secrets set --env-file .env` e `supabase functions deploy`.
 
-## 5. Ajustar o login no Supabase
+## 5. Ligar o site ao Supabase
+
+Edite `web/config.js` com a **Project URL** e a chave **anon/publishable** (ambas públicas por natureza; a proteção dos dados vem do login e do RLS), faça o commit e publique o site:
+
+```bash
+sh ops/publicar-site.sh
+```
+
+Ou simplesmente peça ao Claude: **"ligue o site ao Supabase: URL … chave anon …"**.
+
+## 6. Ajustar o login no Supabase
 
 Em **Authentication › URL Configuration**:
 - **Site URL**: `https://guilhermek-maker.github.io/concil-ia/`
@@ -62,7 +79,7 @@ Para a equipe: cada pessoa cria a conta e o dono adiciona o e-mail em **Integra�
 
 > Recomendado depois que a equipe estiver cadastrada: **Authentication › Providers › Email › desative "Allow new users to sign up"**, para ninguém de fora criar contas.
 
-## 6. Sincronização automática (opcional)
+## 7. Sincronização automática (opcional)
 
 Para buscar os últimos 7 dias de todas as integrações de hora em hora, rode no **SQL Editor** do Supabase (troque `<REF>` e `<CRON_SECRET>`):
 
@@ -83,7 +100,8 @@ $$);
 
 | Sintoma | Causa provável |
 |---|---|
-| Tela de login diz "Não foi possível abrir o workspace" | Migrações não aplicadas: rode o workflow do Supabase |
+| Tela de login diz "Não foi possível abrir o workspace" | Migrações não aplicadas: rode o workflow do Supabase (passo 4) |
 | "Funções do servidor indisponíveis" em Integrações | Edge Functions não publicadas ou `SUPABASE_ACCESS_TOKEN` inválido |
 | Assistente responde "Chave da Anthropic inválida" | `ANTHROPIC_API_KEY` errada; corrija o secret e rode o workflow do Supabase |
-| Link de confirmação de e-mail abre página errada | Passo 5 (URL Configuration) |
+| Link de confirmação de e-mail abre página errada | Passo 6 (URL Configuration) |
+| Site continua em "MODO LOCAL" | `web/config.js` vazio ou site não republicado (passo 5) |
