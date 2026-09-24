@@ -115,7 +115,7 @@ function loginView(msg=''){window.Assistant?.sync();
    if(r.error)throw r.error;
    if(mode==='magic')out.textContent='Enviamos um link de acesso para '+email+'.';
    else if(mode==='signup'&&!r.data.session)out.textContent='Conta criada. Confirme pelo link enviado ao seu e-mail e depois entre.';
-  }catch(err){out.textContent=({'Invalid login credentials':'E-mail ou senha incorretos.'})[err.message]||err.message}};
+  }catch(err){out.textContent=({'Invalid login credentials':'E-mail ou senha incorretos.','Signups not allowed for this instance':'Novos cadastros estão fechados. Peça ao dono do workspace para liberar seu acesso.','Signups not allowed for otp':'Novos cadastros estão fechados. Use um e-mail que já tenha conta.'})[err.message]||err.message}};
 }
 
 async function start(session){
