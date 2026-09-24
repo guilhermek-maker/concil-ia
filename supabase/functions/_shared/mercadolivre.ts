@@ -86,17 +86,29 @@ export const mercadolivre: Provider = {
           shipCost = num(costs?.senders?.[0]?.cost);
         }
         let due: string | null = null;
+        const pendentes: Record<string, unknown>[] = [], estornos: Record<string, unknown>[] = [];
         for (const p of group.flatMap((o) => o.payments ?? [])) {
-          if (p.status !== "approved") continue;
+          if (p.status !== "approved" && p.status !== "refunded" && p.status !== "charged_back") continue;
           const mp = await soft(get(ctx, `https://api.mercadopago.com/v1/payments/${p.id}`));
-          due = day(mp?.money_release_date) ?? due;
-          if (mp?.money_release_status === "released") {
+          if (!mp) continue;
+          due = day(mp.money_release_date) ?? due;
+          // Detalhamento do Mercado Pago: explica diferenças (cupom do vendedor, frete, estorno, retenção).
+          const details = {
+            status: mp.status, status_detail: mp.status_detail, liberacao: mp.money_release_status,
+            valor_pago: num(mp.transaction_amount), reembolsado: num(mp.transaction_amount_refunded),
+            cupom: num(mp.coupon_amount), frete_pago_comprador: num(mp.shipping_amount),
+            liquido: num(mp.transaction_details?.net_received_amount),
+            tarifas: (mp.fee_details ?? []).map((f: any) => ({ tipo: f.type, valor: num(f.amount), pagador: f.fee_payer })),
+            parcelas: mp.installments, meio: mp.payment_method_id,
+          };
+          if (mp.status !== "approved") estornos.push({ pagamento: p.id, ...details });
+          else if (mp.money_release_status === "released") {
             out.receipts.push({
               id: `MP-${p.id}`, order_id: key, platform: "Mercado Livre", account: "Mercado Pago",
               date: day(mp.money_release_date)!, amount: round(num(mp.transaction_details?.net_received_amount)),
-              source: "Mercado Pago API", kind: "liberacao", description: `Pagamento ${p.id}`,
+              source: "Mercado Pago API", kind: "liberacao", description: `Pagamento ${p.id}`, details,
             });
-          }
+          } else pendentes.push({ pagamento: p.id, previsao: day(mp.money_release_date), ...details });
         }
         const o = group[0];
         out.marketOrders.push({
@@ -107,7 +119,7 @@ export const mercadolivre: Provider = {
             id: `ML-${o.buyer?.id}`, name: [o.buyer?.first_name, o.buyer?.last_name].filter(Boolean).join(" ") || o.buyer?.nickname,
             city: city ?? undefined, state: state ?? undefined,
           },
-          external: { ml_order_ids: group.map((x) => x.id), pack_id: o.pack_id, status: o.status, buyer_nickname: o.buyer?.nickname },
+          external: { ml_order_ids: group.map((x) => x.id), pack_id: o.pack_id, status: o.status, buyer_nickname: o.buyer?.nickname, mp_a_liberar: pendentes, mp_estornos: estornos },
         });
       }
       const total = num(page?.paging?.total);

@@ -26,7 +26,7 @@ export interface OrderRow {
 
 export interface ReceiptRow {
   id: string; order_id: string | null; platform: Platform; account: string; date: string;
-  amount: number; source: string; kind: string; description?: string | null;
+  amount: number; source: string; kind: string; description?: string | null; details?: Record<string, unknown> | null;
 }
 
 export interface LedgerRow {
