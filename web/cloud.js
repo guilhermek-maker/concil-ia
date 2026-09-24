@@ -99,7 +99,7 @@ function paintStatus(){const el=document.getElementById('cloudStatus');if(!el)re
 Cloud.paintStatus=paintStatus;
 
 // ───────── Tela de acesso ─────────
-function loginView(msg=''){
+function loginView(msg=''){window.Assistant?.sync();
  $('#app').innerHTML=`<div class="auth"><div class="authcard"><div class="brand" style="padding:0;margin-bottom:26px"><span class="mark">${icon('spark')}</span><div>CONCIL-IA<small>CONCILIAÇÃO FINANCEIRA</small></div></div>
  <h1 style="font-size:24px">Entre na sua operação</h1><p>Seus dados ficam protegidos na nuvem e sincronizam entre computadores.</p>
  <form id="authForm" autocomplete="on"><label for="authEmail">E-mail</label><input id="authEmail" type="email" required autocomplete="email" style="width:100%">
