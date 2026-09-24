@@ -3,12 +3,12 @@
 import { day, env, fetchJson, num, round, sleep } from "./common.ts";
 import { emptyResult, type OrderRow, type Platform, type Provider, type SyncContext } from "./types.ts";
 
-const AUTH = "https://www.bling.com.br/Api/v3/oauth";
+const AUTHORIZE = "https://www.bling.com.br/Api/v3/oauth/authorize";
 const api = () => Deno.env.get("BLING_API_BASE") || "https://api.bling.com.br/Api/v3";
 const basic = () => "Basic " + btoa(`${env("BLING_CLIENT_ID")}:${env("BLING_CLIENT_SECRET")}`);
 
 async function token(body: Record<string, string>) {
-  const r = await fetchJson(`${AUTH}/token`, {
+  const r = await fetchJson(`${api()}/oauth/token`, {
     method: "POST",
     headers: { Authorization: basic(), "Content-Type": "application/x-www-form-urlencoded", Accept: "1.0" },
     body: new URLSearchParams(body),
@@ -37,7 +37,7 @@ export const bling: Provider = {
   label: "Bling",
   async authorizeUrl(state) {
     const q = new URLSearchParams({ response_type: "code", client_id: env("BLING_CLIENT_ID"), state });
-    return `${AUTH}/authorize?${q}`;
+    return `${AUTHORIZE}?${q}`;
   },
   async exchange(query) {
     const t = await token({ grant_type: "authorization_code", code: query.get("code") ?? "" });
