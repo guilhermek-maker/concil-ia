@@ -28,7 +28,7 @@ function platformOf(p: any, settings: Record<string, any>): Platform | "ignorar"
   if (mapped) return mapped === "Ignorar" ? "ignorar" : mapped;
   const n = String(p.numeroLoja ?? "").trim();
   if (/^2\d{9,15}$/.test(n)) return "Mercado Livre";
-  if (/^\d{6}[0-9A-Z]{6,10}$/.test(n)) return "Shopee";
+  if (/^\d{6}[0-9A-Z]{8}$/.test(n)) return "Shopee"; // order_sn: AAMMDD + 8 caracteres
   return null;
 }
 
