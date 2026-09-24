@@ -1,0 +1,13 @@
+{
+  "name": "concil-ia",
+  "version": "2.0.0",
+  "private": true,
+  "description": "CONCIL-IA — código-fonte da versão operacional publicada",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs && node --check dist/app.js && node --check dist/importer.js && node --check dist/agent-tools.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
