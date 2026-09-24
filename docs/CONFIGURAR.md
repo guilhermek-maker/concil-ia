@@ -19,15 +19,9 @@ O site já está publicado no GitHub Pages (https://guilhermek-maker.github.io/c
 2. **API Keys › Create Key**. Copie a chave (`sk-ant-...`).
 3. Recomendado: defina um limite mensal de gasto em **Limits** no console da Anthropic.
 
-## 3. Ativar a publicação automática do Supabase (uma vez)
+## 3. Publicação automática do Supabase
 
-O workflow que cria as tabelas e publica as funções está em `ops/github-workflows/`. O GitHub só aceita arquivos de workflow enviados por um login com o escopo `workflow`. No terminal, na pasta do projeto:
-
-```bash
-gh auth refresh -h github.com -s workflow
-```
-
-Aprove no navegador e depois peça ao Claude: **"ative os workflows do CONCIL-IA"** (ou rode `git mv ops/github-workflows .github/workflows`, faça o commit e o push).
+Já ativada: `.github/workflows/supabase.yml` aplica migrações, envia segredos e publica as funções a cada push em `supabase/` (ou manualmente em **Actions › Publicar banco e funções (Supabase) › Run workflow**).
 
 ## 4. Cadastrar segredos e variáveis no GitHub
 
