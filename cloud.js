@@ -3,7 +3,7 @@
 // Sem config.js preenchido, o CONCIL-IA continua no modo local (dados neste navegador).
 (()=>{
 const cfg=window.CONCILIA_CONFIG||{};
-const Cloud=window.Cloud={enabled:!!(cfg.supabaseUrl&&cfg.supabaseAnonKey&&window.supabase),client:null,session:null,ws:null,wsName:'',role:'',state:'idle',error:'',localBackup:null};
+const Cloud=window.Cloud={workspaces:[],enabled:!!(cfg.supabaseUrl&&cfg.supabaseAnonKey&&window.supabase),client:null,session:null,ws:null,wsName:'',role:'',state:'idle',error:'',localBackup:null};
 document.body.classList.remove('booting');
 if(!Cloud.enabled){Cloud.state='local';return}
 
@@ -54,6 +54,8 @@ async function load(){
  if(months.length&&!months.includes(month))month=months.at(-1);
 }
 Cloud.reload=async()=>{await flush();await load();render()};
+Cloud.switchWs=async id=>{const w=Cloud.workspaces.find(x=>x.id===id);if(!w||id===Cloud.ws)return;await flush();Cloud.ws=w.id;Cloud.wsName=w.name;Cloud.role=w.role;try{localStorage.setItem('concilia-ws',id)}catch{}await load();window.Integrations&&(Integrations.state.loaded=false);render();toast('Workspace: '+w.name)};
+Cloud.renameWs=async name=>{const {error}=await sb.from('workspaces').update({name}).eq('id',Cloud.ws);if(error)throw error;Cloud.wsName=name;const w=Cloud.workspaces.find(x=>x.id===Cloud.ws);if(w)w.name=name};
 
 async function flush(){
  if(flushing){dirty=true;return flushing}
@@ -122,9 +124,12 @@ async function start(session){
  try{
   $('#app').innerHTML='<div class="auth"><div class="authcard"><p>Carregando seus dados…</p></div></div>';
   const {data:ws,error}=await sb.rpc('ensure_workspace');if(error)throw error;
-  Cloud.ws=ws;
-  const [{data:w},{data:m}]=await Promise.all([sb.from('workspaces').select('name').eq('id',ws).single(),sb.from('workspace_members').select('role').eq('workspace_id',ws).eq('user_id',session.user.id).single()]);
-  Cloud.wsName=w?.name||'Minha operação';Cloud.role=m?.role||'member';
+  // Quem foi adicionado a uma equipe abre o workspace da equipe; a escolha fica lembrada neste navegador.
+  const {data:mems,error:me}=await sb.from('workspace_members').select('workspace_id,role,created_at,workspaces(name)').eq('user_id',session.user.id).order('created_at');if(me)throw me;
+  Cloud.workspaces=(mems||[]).map(m=>({id:m.workspace_id,role:m.role,name:m.workspaces?.name||'Minha operação'}));
+  let pref=null;try{pref=localStorage.getItem('concilia-ws')}catch{}
+  const chosen=Cloud.workspaces.find(w=>w.id===pref)||Cloud.workspaces.find(w=>w.role==='member')||Cloud.workspaces.find(w=>w.id===ws)||{id:ws,role:'owner',name:'Minha operação'};
+  Cloud.ws=chosen.id;Cloud.wsName=chosen.name;Cloud.role=chosen.role;
   await load();
   const h=location.hash.slice(1).split('?')[0];if(h)page=decodeURIComponent(h);
   render();
@@ -136,7 +141,7 @@ function offerMigration(){const b=Cloud.localBackup;modal('Levar dados deste nav
 
 document.addEventListener('click',async e=>{const b=e.target.closest('button[data-cloud]');if(!b)return;
  const a=b.dataset.cloud;
- if(a==='migrate'){const src=Cloud.localBackup;db.orders=src.orders;db.receipts=src.receipts;db.imports=src.imports||[];db.closures=src.closures||{};db.audit=[...(src.audit||[]),...db.audit];Cloud.localBackup=null;audit('Dados locais enviados à nuvem',`${src.orders.length} pedidos e ${src.receipts.length} liberações copiados deste navegador.`);closeModal();render();await flush();toast('Dados copiados para a nuvem.')}
+ if(a==='migrate'){const src=Cloud.localBackup;db.orders=src.orders;db.receipts=src.receipts;db.imports=src.imports||[];db.closures=src.closures||{};db.ledger=src.ledger||[];db.crm=src.crm||{};db.audit=[...(src.audit||[]),...db.audit];Cloud.localBackup=null;audit('Dados locais enviados à nuvem',`${src.orders.length} pedidos e ${src.receipts.length} liberações copiados deste navegador.`);closeModal();render();await flush();toast('Dados copiados para a nuvem.')}
  if(a==='logout'){await flush();await sb.auth.signOut();db=seed();snap={};render()}
  if(a==='reload'){b.disabled=true;await Cloud.reload();toast('Dados atualizados.')}
 });
