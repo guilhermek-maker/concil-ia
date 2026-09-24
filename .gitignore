@@ -2,5 +2,11 @@ node_modules/
 .env
 .env.*
 !.env.example
+.secrets.env
 .DS_Store
 *.log
+_site/
+supabase/.temp/
+supabase/.branches/
+supabase/functions/deno.lock
+.claude/

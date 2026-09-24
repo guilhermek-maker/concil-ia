@@ -1,0 +1,13 @@
+# Configuração usada pelo Supabase CLI (deploy pelo GitHub Actions).
+project_id = "concil-ia"
+
+[functions.ai-assistant]
+verify_jwt = true
+
+# Valida o usuário por conta própria (JWT) ou pelo CRON_SECRET na sincronização agendada.
+[functions.integrations]
+verify_jwt = false
+
+# Retorno do OAuth das plataformas: público, protegido pelo "state" assinado.
+[functions.oauth-callback]
+verify_jwt = false

@@ -1,78 +1,67 @@
-# CONCIL-IA — código-fonte completo
+# CONCIL-IA
 
-Este pacote contém o código da versão publicada após a remoção dos dados demonstrativos e a ampliação da importação. Os arquivos em `dist/` são código-fonte editável, apesar do nome da pasta; não há compilação, framework obrigatório nem instalação de dependências.
+Conciliação financeira de e-commerce entre o **Bling** (ERP, origem fiscal) e os marketplaces **Mercado Livre / Mercado Pago**, **Shopee** e **Magalu**, com assistente de IA (Claude), ranking de produtos, vendas por estado, CRM e entradas e saídas do ERP.
 
-## Executar no seu computador
+**Site:** https://guilhermek-maker.github.io/concil-ia/
 
-Com Node.js 18 ou superior instalado, extraia o ZIP, abra um terminal na pasta `CONCIL-IA-codigo-fonte` e execute:
+## O que ele faz
 
-```sh
-npm start
-```
-
-Abra **http://127.0.0.1:3000**. Também funciona executar `node server.mjs`. O servidor escuta apenas no computador local.
-
-Alternativa com Python 3, sem Node:
-
-```sh
-python -m http.server 3000 --bind 127.0.0.1 --directory dist
-```
-
-Use HTTP local em vez de dar duplo clique no HTML: o leitor de PDF precisa carregar módulos e um Web Worker. As bibliotecas já estão incluídas; os documentos não são enviados a um leitor externo.
-
-## Arquivos para editar
-
-| Arquivo | Responsabilidade |
+| Área | O que entrega |
 |---|---|
-| `dist/index.html` | Página inicial, metadados e ordem dos scripts |
-| `dist/style.css` | Visual, temas escuro/claro e responsividade |
-| `dist/app.js` | Dashboard, pedidos, regras de conciliação, migração dos dados fictícios, auditoria, fechamento e relatórios |
-| `dist/importer.js` | Importação multiformato, extração de PDF, mapeamento e validação |
-| `dist/agent-tools.js` | Integração opcional WebMCP; navegadores sem suporte usam a interface normal |
-| `dist/vendor/` | SheetJS e PDF.js, incluindo o worker e as licenças |
-| `.openai/hosting.json` | Identificação do site existente para futuras publicações no Sites |
-| `server.mjs` | Servidor local sem dependências |
-| `package.json` | Atalhos de execução e verificação |
+| Visão geral | Bruto, taxas, líquido, recebido, a receber, em trânsito, divergências e conciliado da competência; inteligência comercial resumida |
+| Central de Conciliação | Motor de correspondência (pedido idêntico, valor, data), **conciliação em lote das correspondências exatas**, vínculo/desvínculo com auditoria |
+| Integrações | Conexão OAuth oficial com Bling, Mercado Livre, Shopee e Magalu; sincronização por período; mapeamento de lojas do Bling |
+| Assistente de IA | Claude lê os dados por ferramentas, investiga divergências, **propõe vínculos** (você confirma), analisa produtos, estados, clientes e contas |
+| Entradas e saídas | Contas a receber e a pagar do Bling × repasses dos marketplaces |
+| Produtos | Ranking por receita/quantidade, curva ABC, participação por canal |
+| Estados | Mapa do Brasil por receita, ticket médio por UF |
+| Clientes · CRM | Segmentos (VIP, Recorrente, Novo, Em risco, Inativo), estágios, etiquetas, contatos, follow-ups e listas para campanhas |
+| Importação | CSV, TSV, TXT, XLSX, XLS, ODS e PDF com texto, com mapeamento de colunas (inclui cliente, UF e produto opcionais) |
+| Fechamento, relatórios, auditoria | Fechamento mensal com ressalvas, retrato exportável, CSV para a contabilidade, trilha de auditoria |
 
-Não altere a ordem dos scripts sem revisar as dependências entre eles. Preserve `vendor/` e as licenças ao distribuir o projeto. A configuração `.openai/hosting.json` não contém senha ou token; preserve seu `project_id` para atualizar o mesmo site. Em outra hospedagem, publique a pasta `dist/`; a configuração `.openai/` não é necessária lá.
+Princípio mantido desde a versão original: **nada financeiro é gravado sem confirmação humana.** Integrações e IA trazem e sugerem; você confirma.
 
-## Verificação rápida
+## Arquitetura
 
-```sh
-npm run check
+```
+GitHub Pages (web/)  ──►  Supabase
+  HTML/CSS/JS puro          ├─ Auth (e-mail e senha / link mágico)
+  sem build                 ├─ Postgres com RLS por workspace (supabase/migrations)
+                            └─ Edge Functions (supabase/functions)
+                                 ├─ integrations    conectar / sincronizar / desconectar
+                                 ├─ oauth-callback  retorno do OAuth das plataformas
+                                 └─ ai-assistant    chamada ao Claude (ferramentas rodam no navegador)
 ```
 
-Esse comando verifica a sintaxe, mas não substitui os testes no navegador. Antes de devolver uma alteração, teste os temas, navegação, importação de uma planilha, mapeamento, confirmação de vínculo e fechamento/reabertura. Use documentos de teste sem informações sensíveis. Não publique dados fictícios dentro da base inicial.
+- **Modo local**: sem `config.js` preenchido, tudo roda no navegador (localStorage), como na versão original.
+- **Modo nuvem**: com Supabase configurado, login, dados sincronizados entre computadores, integrações e IA.
+- Tokens das plataformas ficam em `integration_secrets`, tabela sem acesso pelo navegador.
 
-## Formatos e limites atuais
+## Colocar no ar
 
-- CSV, TSV e TXT delimitado; XLSX, XLS e ODS, com seleção de aba e mapeamento de colunas.
-- PDF com texto selecionável: extração assistida e revisão obrigatória. PDFs escaneados precisam de OCR externo; documentos protegidos não são lidos.
-- Até 20 MB por arquivo, 10.000 linhas por importação e 100 páginas por PDF. A tabela padronizada enviada à validação também deve respeitar o limite de 5 MB.
-- A leitura de qualquer formato não garante interpretação automática de qualquer layout. Conferir a prévia é obrigatório.
-- A investigação usa regras locais; não há API de IA conectada. Não há sincronização automática com os marketplaces.
+Siga **[docs/CONFIGURAR.md](docs/CONFIGURAR.md)** (≈15 min) e depois **[docs/INTEGRACOES.md](docs/INTEGRACOES.md)** para cada plataforma.
+A publicação é automática: todo `git push` na `main` atualiza o site (GitHub Pages) e, quando `supabase/` muda, o banco e as funções.
 
-## Dados e acesso
+## Rodar no computador
 
-Os registros ficam no `localStorage` do navegador, na chave `concilia-v1-local`. Não existe banco em nuvem nem sincronização entre dispositivos. O arquivo original importado não é arquivado. Exporte backups pela aplicação antes de mexer em regras de armazenamento.
+```sh
+npm start          # http://127.0.0.1:3000
+npm run check      # sintaxe dos scripts
+```
 
-O site publicado tem controle de acesso fornecido pelo Sites. Esse controle **não acompanha o servidor local nem uma cópia hospedada em outro provedor**. O código não implementa login próprio. Para uso compartilhado ou financeiro em produção, ainda é necessário desenvolver armazenamento central, autorização e auditoria apropriados.
+## Arquivos
 
-Uma origem diferente (outro endereço, porta ou navegador) tem uma base independente. O pacote não contém seus registros importados, arquivos financeiros, dados de navegador, credenciais, histórico Git ou chaves de API. Exportação de backup existe; restauração do backup pela interface ainda não está implementada.
+| Caminho | Responsabilidade |
+|---|---|
+| `web/app.js` | Núcleo original: dashboard, conciliação, fechamento, relatórios, auditoria |
+| `web/importer.js` | Importação multiformato e mapeamento de colunas |
+| `web/features.js` | Integrações, entradas e saídas, produtos, estados, CRM, conciliação em lote, navegação por `#pagina` |
+| `web/assistant.js` | Painel do assistente e execução das ferramentas da IA |
+| `web/cloud.js` | Login, carga do workspace e gravação incremental no Supabase |
+| `web/config.js` | Gerado na publicação (URL e chave pública do Supabase) |
+| `supabase/migrations/` | Esquema, RLS e funções SQL |
+| `supabase/functions/_shared/` | Conectores Bling, Mercado Livre, Shopee, Magalu e gravação com mesclagem segura |
+| `supabase/functions/ai-assistant/prompt.ts` | Prompt e ferramentas do assistente (espelhados em `web/assistant.js`) |
+| `.github/workflows/` | Publicação do site, do Supabase e verificação |
 
-## Como devolver o código atualizado aqui
-
-1. Faça uma cópia do projeto e edite os arquivos necessários.
-2. Confira o funcionamento localmente.
-3. Compacte a pasta e anexe o ZIP nesta conversa, explicando o que mudou e se deseja publicar.
-4. Para uma alteração pequena, você pode colar o código, indicando **o caminho exato do arquivo** e se é o arquivo completo ou apenas um trecho. Não cole as bibliotecas grandes de `vendor/`.
-
-Não inclua `.env`, tokens, senhas, chaves, `node_modules`, `.git` ou documentos reais no pacote de código. Se modificar estrutura de dados ou armazenamento, avise para que a atualização preserve os registros existentes. Só colar ou anexar código não atualiza o site automaticamente: é necessário integrar, verificar e publicar a alteração.
-
-## Origem desta entrega
-
-Site: https://concil-ia-klemann.gklemann.chatgpt.site
-
-Revisão publicada: `539b002b931cf076ad0aa3cad109d38199be52d6`.
-
-`SHA256SUMS.txt` registra as assinaturas dos arquivos deste pacote. As licenças dos componentes de terceiros estão em `dist/vendor/`.
+Regras para quem (humano ou IA) for alterar o código: **[AGENTS.md](AGENTS.md)**.

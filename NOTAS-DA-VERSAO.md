@@ -1,15 +1,15 @@
-# CONCIL-IA
+# Notas da versão
 
-Versão operacional com base vazia. Site estático em `dist`, sem compilação. Sirva essa pasta via HTTP para carregar o leitor de PDFs.
+## 3.0 — nuvem, integrações, IA e inteligência comercial (set/2026)
 
-Preserva dashboard, matching com confirmação, investigação por regras, auditoria local, fechamento e relatórios. Remove registros de origem Demonstração de bases anteriores, preserva Importado e reabre fechamentos contaminados por dados fictícios. Novos usuários começam sem registros.
+- **Modo nuvem (Supabase)**: login por e-mail, workspace compartilhado pela equipe, dados sincronizados entre computadores, gravação incremental com indicador de status. Sem configuração, continua no modo local.
+- **Integrações oficiais (OAuth)**: Bling (pedidos, NF, itens, cliente, UF, contas a receber/pagar), Mercado Livre + Mercado Pago (tarifas, frete, liberações), Shopee (escrow e repasses), Magalu (pedidos). Sincronização por período, retomável, sem sobrescrever vínculos, anotações ou fechamentos.
+- **Assistente de IA (Claude)**: consulta pedidos, liberações, produtos, estados, clientes e contas; investiga divergências; propõe vínculos em lote para confirmação.
+- **Conciliação em lote** das correspondências exatas (pedido idêntico + valor exato), com revisão e auditoria.
+- **Novas telas**: Integrações, Entradas e saídas, Produtos (ranking e curva ABC), Estados (mapa do Brasil), Clientes · CRM (segmentos, estágios, etiquetas, contatos, follow-ups, listas de campanha).
+- **Importação**: colunas opcionais de cliente, CPF/CNPJ, UF, produto, SKU e quantidade.
+- Navegação por endereço (`#clientes`, `#integracoes`…), publicação automática via GitHub Actions.
 
-Importação: CSV, TSV, TXT delimitado, XLSX, XLS e ODS, com seleção de aba, linha de cabeçalho e mapeamento de colunas. PDF com texto: extração de linhas e colunas, editor de revisão e mapeamento. Não há OCR; PDFs sem texto ou protegidos são recusados. Não promete interpretação universal de layouts. Valores negativos, estornos e rateios não são suportados pelo modelo atual. Limites: 20 MB por arquivo, 10.000 linhas, 100 páginas PDF.
+## 2.0 — base operacional (versão publicada no ChatGPT Sites)
 
-Registros importados permanecem neste navegador. Os arquivos originais não são arquivados. Não há conexão real às plataformas, IA externa ou sincronização entre dispositivos. Exporte backups regularmente. Esta edição não substitui validação contábil nem um sistema com armazenamento central e auditoria inviolável.
-
-Vínculos e fechamentos exigem confirmação na interface. A restrição de acesso do site é fornecida pela hospedagem.
-
-WebMCP opcional: leitura de resumo e abertura de revisão; não confirma ações financeiras. Navegadores sem suporte usam a interface normal.
-
-Leitores hospedados no próprio site: SheetJS CE 0.20.3 (Apache-2.0, https://docs.sheetjs.com/docs/getting-started/installation/standalone/) e PDF.js 5.6.205 (Apache-2.0, https://mozilla.github.io/pdf.js/). Nenhum documento é enviado a serviços externos para leitura.
+Base vazia, importação multiformato (CSV, planilhas, PDF com texto), matching com confirmação, investigação por regras, fechamento, relatórios e auditoria locais.

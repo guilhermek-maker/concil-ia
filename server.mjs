@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { stat, readFile, realpath } from 'node:fs/promises';
 
 // Servidor de desenvolvimento local. Não substitui uma hospedagem com autenticação.
-const root = await realpath(fileURLToPath(new URL('./dist/', import.meta.url)));
+const root = await realpath(fileURLToPath(new URL('./web/', import.meta.url)));
 const port = Number(process.env.PORT || 3000);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw Error('PORT inválida');
 const mime = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=utf-8',
