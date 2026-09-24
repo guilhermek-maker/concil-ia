@@ -11,3 +11,7 @@ verify_jwt = false
 # Retorno do OAuth das plataformas: público, protegido pelo "state" assinado.
 [functions.oauth-callback]
 verify_jwt = false
+
+[auth]
+site_url = "https://guilhermek-maker.github.io/concil-ia/"
+additional_redirect_urls = ["https://guilhermek-maker.github.io/concil-ia/**", "http://127.0.0.1:3000/**"]
