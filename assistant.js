@@ -37,7 +37,9 @@ const tools={
 const toolLabel={resumo_competencia:'Lendo o resumo da competência',listar_pedidos:'Consultando pedidos',listar_liberacoes:'Consultando liberações',sugerir_vinculos:'Procurando correspondências',propor_vinculos:'Preparando propostas de vínculo',analisar_divergencias:'Analisando divergências',ranking_produtos:'Calculando ranking de produtos',vendas_por_estado:'Agrupando vendas por estado',clientes:'Consultando clientes',entradas_saidas:'Lendo entradas e saídas',salvar_anotacao:'Salvando anotação'};
 
 // ───────── Estado e interface ─────────
-let convo=[],view=[],busy=false,open=false,notes=[],lastEnabled=null;
+let convo=[],view=[],busy=false,open=false,notes=[],lastEnabled=null,aiReady=null;
+// Sem ANTHROPIC_API_KEY no servidor, o painel explica que a análise é feita pelo Claude Code.
+async function checkAi(){if(aiReady!==null||!window.Cloud?.ws)return;try{const st=await Integrations.callFn('integrations',{action:'status'});aiReady=!!st.ai}catch{aiReady=true}paint()}
 const proposals=[];
 function addProposal(pairs){proposals.push({pairs,done:false});view.push({type:'proposal',idx:proposals.length-1});paint()}
 
@@ -57,11 +59,12 @@ function md(src){let s=esc(src);const blocks=[];s=s.replace(/```[\w-]*\n?([\s\S]
  flushList();flushTable();return out.join('').replace(/\u0000(\d+)\u0000/g,(_,i)=>blocks[i])}
 
 function paint(){
- const enabled=window.Cloud?.enabled&&Cloud.ws;
+ const enabled=window.Cloud?.enabled&&Cloud.ws&&aiReady!==false;
+ if(open)checkAi();
  const loginScreen=window.Cloud?.enabled&&!Cloud.ws;
  root.innerHTML=`<button class="fab ${open||loginScreen?'hidden':''}" data-ai="open" aria-label="Abrir assistente de IA">${icon('spark')}<span>IA</span></button>
  <section class="drawer ${open?'open':''}" aria-label="Assistente de IA" ${open?'':'inert'}><div class="drawerhead"><div class="row"><span class="mark">${icon('spark')}</span><div><strong>Assistente CONCIL-IA</strong><br><span class="caption">Concilia, investiga e analisa seus dados</span></div></div><div class="row"><button class="quiet small" data-ai="new" title="Nova conversa" aria-label="Nova conversa">${icon('refresh')}</button><button class="quiet small" data-ai="close" aria-label="Fechar assistente">${icon('close')}</button></div></div>
- <div class="chat" id="aiChat">${!enabled?`<div class="notice">O assistente usa a IA Claude pela nuvem do CONCIL-IA. ${window.Cloud?.enabled?'Entre na sua conta para usar.':'Ative o modo nuvem (docs/CONFIGURAR.md) para liberar.'}</div>`:view.length?view.map(item).join(''):`<div class="aihello"><h3>Como posso ajudar?</h3><p class="caption">Eu leio pedidos, liberações, produtos, clientes e contas do Bling desta base. Vínculos que eu sugerir só entram depois da sua confirmação.</p><div class="chips">${SUGGESTIONS.map(s=>`<button class="small" data-ai-suggest="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>`}${busy?`<div class="msg bot"><span class="typing"><i></i><i></i><i></i></span></div>`:''}</div>
+ <div class="chat" id="aiChat">${aiReady===false?`<div class="notice"><strong>Assistente embutido desativado.</strong> Ele usa a API da Anthropic, que exige créditos próprios e ainda não foi configurada.<br><br>Enquanto isso, a IA de conciliação é o <strong>Claude Code</strong>, que lê esta mesma base na nuvem. Peça lá, por exemplo: <em>“concilie setembro no CONCIL-IA”</em>, <em>“explique as divergências da Shopee”</em> ou <em>“quais clientes devo reativar?”</em>. Os vínculos sugeridos continuam sendo confirmados por você aqui na ferramenta.</div>`:!enabled?`<div class="notice">O assistente usa a IA Claude pela nuvem do CONCIL-IA. ${window.Cloud?.enabled?'Entre na sua conta para usar.':'Ative o modo nuvem (docs/CONFIGURAR.md) para liberar.'}</div>`:view.length?view.map(item).join(''):`<div class="aihello"><h3>Como posso ajudar?</h3><p class="caption">Eu leio pedidos, liberações, produtos, clientes e contas do Bling desta base. Vínculos que eu sugerir só entram depois da sua confirmação.</p><div class="chips">${SUGGESTIONS.map(s=>`<button class="small" data-ai-suggest="${esc(s)}">${esc(s)}</button>`).join('')}</div></div>`}${busy?`<div class="msg bot"><span class="typing"><i></i><i></i><i></i></span></div>`:''}</div>
  <form class="composer" id="aiForm"><textarea id="aiInput" rows="2" placeholder="${enabled?'Pergunte ou peça uma tarefa…':'Indisponível'}" ${enabled&&!busy?'':'disabled'}></textarea><button class="primary" type="submit" ${enabled&&!busy?'':'disabled'} aria-label="Enviar">${icon('send')}</button></form></section>`;
  const chat=$('#aiChat');if(chat)chat.scrollTop=chat.scrollHeight;
  const input=$('#aiInput');if(input&&open&&!busy)input.focus();
