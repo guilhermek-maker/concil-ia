@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2.117.0";
-import { HttpError } from "./common.ts";
+import { HttpError, round } from "./common.ts";
 import { bling } from "./bling.ts";
 import { magalu } from "./magalu.ts";
 import { mercadolivre } from "./mercadolivre.ts";
@@ -73,12 +73,19 @@ export async function persist(db: SupabaseClient, ws: string, res: SyncResult) {
     const e = current(m.id);
     // Pedido já existente vindo do Bling ou de importação manual é a referência fiscal.
     const fiscal = e && (e.source === "Bling API" || !e.source.endsWith(" API"));
+    // O repasse esperado é o que a plataforma calcula (venda − tarifas − frete do vendedor). Quando a NF do
+    // Bling tem valor diferente da venda na plataforma (frete cobrado do cliente, juros etc.), a diferença entra
+    // na "taxa" para que bruto − taxa = repasse esperado, e fica registrada em external.diferenca_nf.
+    const expected = m.fee_source ? round(m.gross - m.fee) : null;
     merged.set(m.id, !e ? m : fiscal ? {
       ...e,
-      fee: m.fee_source ? m.fee : e.fee, fee_source: m.fee_source ?? e.fee_source,
+      fee: expected !== null ? round(e.gross - expected) : e.fee, fee_source: m.fee_source ?? e.fee_source,
       due: m.due ?? e.due, shipping: m.shipping ?? e.shipping, state: e.state ?? m.state,
       customer: fill(e.customer, m.customer), items: e.items?.length ? e.items : m.items,
-      external: { ...(e.external ?? {}), ...(m.external ?? {}) },
+      external: {
+        ...(e.external ?? {}), ...(m.external ?? {}),
+        venda_plataforma: m.gross, tarifas_plataforma: m.fee, repasse_previsto: expected, diferenca_nf: round(e.gross - m.gross),
+      },
     } : { ...e, ...m, external: { ...(e.external ?? {}), ...(m.external ?? {}) } });
   }
   const now = new Date().toISOString();
