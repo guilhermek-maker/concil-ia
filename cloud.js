@@ -134,16 +134,16 @@ Cloud.paintStatus=paintStatus;
 function loginView(msg=''){window.Assistant?.sync();
  $('#app').innerHTML=`<div class="auth"><div class="authcard"><div class="complogo login"><img src="brand/comprastore-transparente.png" alt="Compra Store"></div><div class="brand" style="padding:0;margin-bottom:26px"><span class="mark">${icon('marca')}</span><div>EcomBalance<small>CONCILIAÇÃO E RESULTADO</small></div></div>
  <h1 style="font-size:24px">Entre na sua operação</h1><p>Seus dados ficam protegidos na nuvem e sincronizam entre computadores. Primeiro acesso? Informe e-mail e senha e clique em <strong>Criar conta</strong>: o administrador recebe o pedido e libera.</p>
- <form id="authForm" autocomplete="on"><label for="authEmail">E-mail</label><input id="authEmail" type="email" required autocomplete="email" style="width:100%">
+ <form id="authForm" autocomplete="on"><div id="authNomeBox" hidden><label for="authNome">Seu nome</label><input id="authNome" autocomplete="name" style="width:100%" placeholder="Nome e sobrenome"></div><label for="authEmail">E-mail</label><input id="authEmail" type="email" required autocomplete="email" style="width:100%">
  <label for="authPass">Senha</label><input id="authPass" type="password" minlength="8" autocomplete="current-password" style="width:100%" placeholder="Mínimo de 8 caracteres">
  <div class="row wrap" style="margin-top:18px"><button class="primary" type="submit" data-auth="login">Entrar</button><button type="submit" data-auth="signup">Criar conta</button><button type="submit" class="quiet small" data-auth="magic">Receber link por e-mail</button></div></form>
  <div id="authMsg" class="caption" style="margin-top:16px;min-height:20px">${esc(msg)}</div></div></div>`;
  let mode='login';
- $('#authForm').addEventListener('click',e=>{const b=e.target.closest('button[data-auth]');if(b)mode=b.dataset.auth},true);
+ $('#authForm').addEventListener('click',e=>{const b=e.target.closest('button[data-auth]');if(b){mode=b.dataset.auth;if(mode==='signup')$('#authNomeBox').hidden=false}},true);
  $('#authForm').onsubmit=async e=>{e.preventDefault();const email=$('#authEmail').value.trim(),password=$('#authPass').value,out=$('#authMsg');out.textContent='Aguarde…';
   try{let r;const redirect=location.origin+location.pathname;
    if(mode==='magic')r=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:redirect}});
-   else{if(password.length<8)throw Error('Informe uma senha com pelo menos 8 caracteres.');r=mode==='signup'?await sb.auth.signUp({email,password,options:{emailRedirectTo:redirect}}):await sb.auth.signInWithPassword({email,password})}
+   else{if(password.length<8)throw Error('Informe uma senha com pelo menos 8 caracteres.');r=mode==='signup'?await (async()=>{const nome=($('#authNome')?.value||'').trim();if(!nome){$('#authNomeBox').hidden=false;$('#authNome').focus();throw Error('Para criar a conta, informe também o seu nome.')}return sb.auth.signUp({email,password,options:{emailRedirectTo:redirect,data:{nome}}})})():await sb.auth.signInWithPassword({email,password})}
    if(r.error)throw r.error;
    if(mode==='magic')out.textContent='Enviamos um link de acesso para '+email+'.';
    else if(mode==='signup'&&!r.data.session)out.textContent='Conta criada. Confirme pelo link enviado ao seu e-mail e entre: seu pedido de acesso vai para o administrador liberar.';
