@@ -104,5 +104,48 @@ export async function persist(db: SupabaseClient, ws: string, res: SyncResult) {
     const { error } = await db.from("ledger").upsert(ledger.slice(i, i + 500), { onConflict: "workspace_id,id" });
     if (error) throw error;
   }
-  return { orders: orders.length, receipts: receipts.length, ledger: ledger.length };
+  const entradas = await persistEntradas(db, ws, res.purchases ?? [], now);
+  return { orders: orders.length, receipts: receipts.length, ledger: ledger.length, ...entradas };
+}
+
+/**
+ * Notas de entrada e contas a pagar. A nota é dado do Bling (sempre atualizada); o título a pagar é do EcomBalance:
+ * criado uma única vez a partir das parcelas (duplicatas) e nunca sobrescrito — pagamentos e edições ficam preservados.
+ * Nota cancelada cancela os títulos que ainda não tiveram pagamento.
+ */
+async function persistEntradas(db: SupabaseClient, ws: string, notas: import("./types.ts").PurchaseRow[], now: string) {
+  if (!notas.length) return { entradas: 0, titulos: 0 };
+  // A lista do Bling pode repetir uma nota entre páginas (notas novas empurram a paginação): uma por id.
+  notas = [...new Map(notas.map((n) => [n.id, n])).values()];
+  const rows = notas.map((n) => ({ workspace_id: ws, ...n, updated_at: now }));
+  for (let i = 0; i < rows.length; i += 200) {
+    const { error } = await db.from("purchase_invoices").upsert(rows.slice(i, i + 200), { onConflict: "workspace_id,id" });
+    if (error) throw error;
+  }
+  const cancelada = (n: { situacao: string | null }) => /cancel|denegad|rejeitad/i.test(n.situacao ?? "");
+  const titulos: Record<string, unknown>[] = [];
+  for (const n of notas) {
+    if (n.tipo !== "compra" || cancelada(n) || n.valor <= 0) continue;
+    const parc = n.parcelas.filter((p) => p.valor > 0);
+    const lista = parc.length ? parc : [{ data: n.emissao, valor: n.valor, forma: null, obs: "Nota sem duplicatas: confirme o vencimento" }];
+    lista.forEach((p, i) => titulos.push({
+      workspace_id: ws, id: `${n.id}-${i + 1}`, origem: "nfe", invoice_id: n.id, fornecedor: n.fornecedor, fornecedor_doc: n.fornecedor_doc,
+      descricao: `NF ${n.numero ?? ""}${n.serie ? "/" + n.serie : ""} · ${n.fornecedor ?? "fornecedor"}`, documento: n.numero,
+      parcela: i + 1, parcelas: lista.length, emissao: n.emissao, vencimento: p.data ?? n.emissao ?? now.slice(0, 10), valor: p.valor,
+      observacao: p.obs ?? (p.forma ? `Forma: ${p.forma}` : null), categoria: "Compra de mercadorias", created_by: "Bling (nota de entrada)",
+    }));
+  }
+  let criados = 0;
+  for (let i = 0; i < titulos.length; i += 200) {
+    const { data, error } = await db.from("payables").upsert(titulos.slice(i, i + 200), { onConflict: "workspace_id,id", ignoreDuplicates: true }).select("id");
+    if (error) throw error;
+    criados += data?.length ?? 0;
+  }
+  const canceladas = notas.filter(cancelada).map((n) => n.id);
+  if (canceladas.length) {
+    const { error } = await db.from("payables").update({ status: "cancelado", observacao: "Nota fiscal cancelada no Bling", updated_at: now })
+      .eq("workspace_id", ws).in("invoice_id", canceladas).eq("valor_pago", 0).neq("status", "cancelado");
+    if (error) throw error;
+  }
+  return { entradas: notas.length, titulos: criados };
 }

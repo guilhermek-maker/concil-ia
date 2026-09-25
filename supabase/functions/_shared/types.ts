@@ -34,6 +34,14 @@ export interface LedgerRow {
   status: string | null; category: string | null; contact: string | null; description: string | null; source: string;
 }
 
+/** Nota fiscal de entrada como gravada em public.purchase_invoices. */
+export interface PurchaseRow {
+  id: string; numero: string | null; serie: string | null; chave: string | null; emissao: string | null;
+  fornecedor: string | null; fornecedor_doc: string | null; valor: number; cfop: string | null; natureza: string | null;
+  tipo: "compra" | "devolucao" | "outros"; situacao: string | null;
+  itens: unknown; parcelas: { data: string | null; valor: number; forma?: string | null; obs?: string | null }[]; raw: unknown; source: string;
+}
+
 export interface Tokens {
   access_token: string; refresh_token?: string | null; expires_in?: number | null;
   extra?: Record<string, unknown>; account_name?: string | null;
@@ -51,6 +59,7 @@ export interface SyncContext {
   to: string;     // AAAA-MM-DD
   cursor: any;    // continuação de uma execução anterior
   deadline: number; // Date.now() limite para parar e devolver "next"
+  fases?: string[]; // restringe as etapas (ex.: só "entradas" para buscar o histórico de notas de entrada)
 }
 
 export interface SyncResult {
@@ -60,6 +69,8 @@ export interface SyncResult {
   marketOrders: OrderRow[];
   receipts: ReceiptRow[];
   ledger: LedgerRow[];
+  /** Notas fiscais de entrada (compras de fornecedores, devoluções). */
+  purchases?: PurchaseRow[];
   next: any | null;
   notes: string[];
   unmapped?: Record<string, { count: number; sample: string; name?: string }>;
@@ -75,4 +86,4 @@ export interface Provider {
   sync(ctx: SyncContext): Promise<SyncResult>;
 }
 
-export const emptyResult = (): SyncResult => ({ fiscalOrders: [], marketOrders: [], receipts: [], ledger: [], next: null, notes: [] });
+export const emptyResult = (): SyncResult => ({ fiscalOrders: [], marketOrders: [], receipts: [], ledger: [], purchases: [], next: null, notes: [] });

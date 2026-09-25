@@ -1,7 +1,7 @@
 // Bling API v3 — https://developer.bling.com.br
 // Pedidos de venda (origem fiscal), itens, cliente/UF, taxas e contas a receber / a pagar.
 import { day, env, fetchJson, num, round, sleep } from "./common.ts";
-import { emptyResult, type OrderRow, type Platform, type Provider, type SyncContext } from "./types.ts";
+import { emptyResult, type OrderRow, type Platform, type Provider, type PurchaseRow, type SyncContext } from "./types.ts";
 
 const AUTHORIZE = "https://www.bling.com.br/Api/v3/oauth/authorize";
 const api = () => Deno.env.get("BLING_API_BASE") || "https://api.bling.com.br/Api/v3";
@@ -49,7 +49,10 @@ export const bling: Provider = {
   async sync(ctx) {
     const out = emptyResult();
     out.unmapped = {};
-    let cur = ctx.cursor ?? { phase: "pedidos", page: 1, idx: 0 };
+    // Etapas na ordem; um job pode pedir só algumas (ex.: histórico só de notas de entrada).
+    const FASES = ["pedidos", "receber", "pagar", "entradas"].filter((f) => !ctx.fases?.length || ctx.fases.includes(f));
+    const depois = (f: string) => { const i = FASES.indexOf(f); return i >= 0 && i + 1 < FASES.length ? { phase: FASES[i + 1], page: 1, idx: 0 } : null; };
+    let cur = ctx.cursor ?? (FASES.length ? { phase: FASES[0], page: 1, idx: 0 } : null);
     const cancelled = new Set((ctx.settings.situacoesIgnoradas ?? [12]).map(String));
 
     while (cur && Date.now() < ctx.deadline) {
@@ -96,18 +99,28 @@ export const bling: Provider = {
           };
           out.fiscalOrders.push(row);
         }
-        cur = list.length === 100 ? { phase: "pedidos", page: cur.page + 1, idx: 0 } : { phase: "receber", page: 1 };
+        cur = list.length === 100 ? { phase: "pedidos", page: cur.page + 1, idx: 0 } : depois("pedidos");
       } else if (cur.phase === "receber") {
         const q = new URLSearchParams({ pagina: String(cur.page), limite: "100", dataInicial: ctx.from, dataFinal: ctx.to, tipoFiltroData: "V" });
         const list = (await get(ctx, `/contas/receber?${q}`))?.data ?? [];
         for (const c of list) out.ledger.push(ledgerRow(c, "entrada"));
-        cur = list.length === 100 ? { phase: "receber", page: cur.page + 1 } : { phase: "pagar", page: 1 };
+        cur = list.length === 100 ? { phase: "receber", page: cur.page + 1 } : depois("receber");
       } else if (cur.phase === "pagar") {
         const q = new URLSearchParams({ pagina: String(cur.page), limite: "100", dataVencimentoInicial: ctx.from, dataVencimentoFinal: ctx.to });
         const list = (await get(ctx, `/contas/pagar?${q}`))?.data ?? [];
         for (const c of list) out.ledger.push(ledgerRow(c, "saida"));
-        cur = list.length === 100 ? { phase: "pagar", page: cur.page + 1 } : null;
-      }
+        cur = list.length === 100 ? { phase: "pagar", page: cur.page + 1 } : depois("pagar");
+      } else if (cur.phase === "entradas") {
+        // Notas fiscais de entrada (tipo 0): compras de fornecedores viram títulos a pagar no EcomBalance.
+        const q = new URLSearchParams({ pagina: String(cur.page), limite: "100", tipo: "0", dataEmissaoInicial: `${ctx.from} 00:00:00`, dataEmissaoFinal: `${ctx.to} 23:59:59` });
+        const list = (await get(ctx, `/nfe?${q}`))?.data ?? [];
+        for (let i = cur.idx ?? 0; i < list.length; i++) {
+          if (Date.now() > ctx.deadline) { out.next = { ...cur, idx: i }; return out; }
+          const n = (await get(ctx, `/nfe/${list[i].id}`))?.data ?? list[i];
+          out.purchases!.push(notaEntrada(n));
+        }
+        cur = list.length === 100 ? { phase: "entradas", page: cur.page + 1, idx: 0 } : depois("entradas");
+      } else cur = null;
     }
     out.next = cur;
     const miss = Object.values(out.unmapped).reduce((a, u) => a + u.count, 0);
@@ -130,5 +143,30 @@ function ledgerRow(c: any, kind: "entrada" | "saida") {
     contact: c.contato?.nome ?? (c.contato?.id ? `Contato ${c.contato.id}` : null),
     description: c.historico ?? c.numeroDocumento ?? null,
     source: "Bling API",
+  };
+}
+
+const situacoesNfe: Record<string, string> = { "1": "Pendente", "2": "Cancelada", "3": "Aguardando recibo", "4": "Rejeitada", "5": "Autorizada", "6": "Emitida DANFE", "7": "Registrada", "8": "Aguardando protocolo", "9": "Denegada", "10": "Consulta situação", "11": "Bloqueada" };
+
+/** Tipo da entrada pelo CFOP: devolução de venda, compra (gera contas a pagar) ou outras (remessas, bonificações…). */
+function tipoEntrada(cfop: string): PurchaseRow["tipo"] {
+  const c = cfop.replace(/\D/g, "");
+  const f = c.slice(1);
+  if (/^(201|202|203|204|208|209|410|411|503|553|555|660|661|662)$/.test(f)) return "devolucao";
+  if (/^(101|102|111|113|116|117|118|120|121|122|124|125|126|128|252|253|301|302|303|304|305|306|351|352|353|354|355|356|401|403|406|407|551|556|651|652|653|932|933)$/.test(f)) return "compra";
+  return c ? "outros" : "compra";
+}
+
+function notaEntrada(n: any): PurchaseRow {
+  const itens = (n.itens ?? []).map((it: any) => ({ sku: String(it.codigo ?? ""), descricao: it.descricao, qtd: num(it.quantidade), valor: round(num(it.valor)), total: round(num(it.valorTotal ?? num(it.valor) * num(it.quantidade))), cfop: it.cfop ?? null, ncm: it.classificacaoFiscal ?? null }));
+  const cfop = String(n.itens?.[0]?.cfop ?? n.naturezaOperacao?.cfop ?? "");
+  const valor = round(num(n.valorNota ?? n.valorTotal ?? itens.reduce((a: number, i: any) => a + i.total, 0)));
+  const parcelas = (n.parcelas ?? []).map((p: any) => ({ data: day(p.data ?? p.dataVencimento), valor: round(num(p.valor)), forma: p.formaPagamento?.descricao ?? (p.formaPagamento?.id ? String(p.formaPagamento.id) : null), obs: p.observacoes ?? p.observacao ?? null }));
+  return {
+    id: `BLING-NFE-${n.id}`, numero: n.numero ? String(n.numero) : null, serie: n.serie != null ? String(n.serie) : null, chave: n.chaveAcesso ?? null,
+    emissao: day(n.dataEmissao ?? n.dataOperacao), fornecedor: n.contato?.nome ?? null, fornecedor_doc: n.contato?.numeroDocumento ?? null,
+    valor, cfop: cfop || null, natureza: n.naturezaOperacao?.descricao ?? (n.naturezaOperacao?.id ? String(n.naturezaOperacao.id) : null),
+    tipo: tipoEntrada(cfop), situacao: situacoesNfe[String(n.situacao)] ?? (n.situacao != null ? String(n.situacao) : null),
+    itens, parcelas, raw: { ...n, xml: undefined, itens: undefined }, source: "Bling API",
   };
 }

@@ -17,7 +17,7 @@ const LOCK_MS = 140_000;
 const HOURLY_MS = 60 * 60_000;
 
 type Db = ReturnType<typeof admin>;
-interface Job { from: string; to: string; cursor: unknown; locked_until?: number | null; started_at?: string; saved?: Record<string, number> }
+interface Job { from: string; to: string; fases?: string[]; cursor: unknown; locked_until?: number | null; started_at?: string; saved?: Record<string, number> }
 
 const readSettings = async (db: Db, ws: string, id: string) =>
   ((await db.from("integrations").select("settings").eq("workspace_id", ws).eq("provider", id).maybeSingle()).data?.settings ?? {}) as Record<string, any>;
@@ -32,7 +32,7 @@ async function writeSettings(db: Db, ws: string, id: string, change: (s: Record<
 async function runRound(db: Db, ws: string, id: string, job: Job, deadline: number) {
   const settings = await readSettings(db, ws, id);
   const secret = await validSecret(db, ws, id);
-  const res = await provider(id).sync({ token: secret.access_token, extra: secret.extra ?? {}, settings, from: job.from, to: job.to, cursor: job.cursor, deadline });
+  const res = await provider(id).sync({ token: secret.access_token, extra: secret.extra ?? {}, settings, from: job.from, to: job.to, cursor: job.cursor, deadline, fases: job.fases });
   const saved = await persist(db, ws, res);
   return { res, saved };
 }
@@ -57,7 +57,7 @@ async function advanceJob(db: Db, ws: string, id: string, deadline: number) {
     }, { status: "conectado", last_error: null, ...(done ? { last_sync: new Date().toISOString() } : {}) });
     return { done, saved: total, notes: res.notes, unmapped: res.unmapped ?? {} };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = e instanceof Error ? e.message : (e as any)?.message ? [(e as any).message, (e as any).details, (e as any).hint].filter(Boolean).join(" · ") : JSON.stringify(e);
     await writeSettings(db, ws, id, (s) => { if (s.job) s.job.locked_until = null; }, { status: "erro", last_error: msg });
     throw e;
   }
@@ -93,11 +93,11 @@ Deno.serve(handler(async (req) => {
       try {
         if (!i.settings?.job) {
           // Fila de períodos (ex.: histórico desde abril): um por vez, antes da sincronização de hora em hora.
-          const fila = (i.settings?.fila ?? []) as { from: string; to: string }[];
+          const fila = (i.settings?.fila ?? []) as { from: string; to: string; fases?: string[] }[];
           if (fila.length) {
             await writeSettings(db, i.workspace_id, i.provider, (s) => {
               s.fila = (s.fila ?? []).slice(1);
-              s.job = { from: fila[0].from, to: fila[0].to, cursor: null, locked_until: null, started_at: new Date().toISOString(), saved: {} };
+              s.job = { from: fila[0].from, to: fila[0].to, fases: fila[0].fases, cursor: null, locked_until: null, started_at: new Date().toISOString(), saved: {} };
             });
           } else {
             if (i.last_sync && Date.now() - new Date(i.last_sync).getTime() < HOURLY_MS) continue;
