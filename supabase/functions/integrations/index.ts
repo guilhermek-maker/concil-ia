@@ -124,9 +124,11 @@ Deno.serve(handler(async (req) => {
     const list = (data ?? []).sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)));
     const report = [];
     // Tarefa "compras": compras feitas pela própria conta no Mercado Livre / Mercado Pago (como comprador).
-    for (const i of list.filter((x) => x.provider === "mercadolivre" && x.settings?.tarefas?.compras)) {
+    // Pedida à mão (settings.tarefas.compras = data inicial) ou automática uma vez por dia (últimos 30 dias).
+    const diaria = (x: any) => !x.settings?.ultimaTarefa?.fim || Date.now() - new Date(x.settings.ultimaTarefa.fim).getTime() > 24 * 3600_000;
+    for (const i of list.filter((x) => x.provider === "mercadolivre" && (x.settings?.tarefas?.compras || diaria(x)))) {
       try {
-        const r = await comprasMercadoLivre(db, i.workspace_id, String(i.settings.tarefas.compras));
+        const r = await comprasMercadoLivre(db, i.workspace_id, String(i.settings?.tarefas?.compras ?? iso(new Date(Date.now() - 30 * 86400_000))));
         await writeSettings(db, i.workspace_id, i.provider, (s) => { delete s.tarefas?.compras; s.ultimaTarefa = { compras: r, fim: new Date().toISOString() }; });
         report.push({ workspace_id: i.workspace_id, compras: r });
       } catch (e) { report.push({ workspace_id: i.workspace_id, compras_erro: String(e) }); }
