@@ -62,7 +62,9 @@ shell=function(){const pm=modDe(page);if(pm)modAtual=pm;if(page!==paginaAnterior
  <div id="erpdrop"></div>`;
  $('#month').onchange=e=>{month=e.target.value;render()};
  if(page==='central')$('.pagehead h1').textContent=saudacao()};
-const saudacao=()=>{const h=new Date().getHours();const n=(window.Cloud?.session?.user?.email||'').split('@')[0].split(/[._]/)[0];return `${h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'}${n?', '+n.charAt(0).toUpperCase()+n.slice(1):''}`};
+// Nome do usuário: o informado no cadastro; sem ele, a primeira parte do e-mail (joao.silva@… → João).
+const nomeUsuario=()=>{const u=window.Cloud?.session?.user;const n=(u?.user_metadata?.nome||'').trim();if(n)return n.split(/\s+/)[0];const e=(u?.email||'').split('@')[0].split(/[._\-0-9]/)[0];return e?e.charAt(0).toUpperCase()+e.slice(1):''};
+const saudacao=()=>{const h=new Date().getHours(),n=nomeUsuario();return `${h<12?'Bom dia':h<18?'Boa tarde':'Boa noite'}${n?', '+n:''}`};
 
 // Menus suspensos do cabeçalho: "+ Novo", avisos e empresa.
 function drop(html,anchor){const r=anchor.getBoundingClientRect(),d=$('#erpdrop');d.innerHTML=`<div class="dropmenu" style="top:${r.bottom+8}px;${r.left>innerWidth/2?`right:${Math.max(12,innerWidth-r.right)}px`:`left:${r.left}px`}">${html}</div>`}
@@ -74,8 +76,9 @@ document.addEventListener('click',e=>{const dm=e.target.closest('.dropmenu');con
  if(a==='empresa')drop(`<div class="drophead">${esc(window.Cloud?.wsName||'Empresa')}</div>${(window.Cloud?.workspaces||[]).length>1?Cloud.workspaces.map(w=>`<button class="dropitem" data-erp-ws="${esc(w.id)}"><span><strong>${esc(w.name)}</strong><small>${w.id===Cloud.ws?'aberta':''}</small></span></button>`).join(''):''}<button class="dropitem" data-nav="equipe">${ico('users',18)}<span><strong>Equipe e acessos</strong><small>Liberar usuários</small></span></button><button class="dropitem" data-nav="integracoes">${ico('plug',18)}<span><strong>Integrações</strong><small>Bling, marketplaces</small></span></button>`,b);
  if(a==='busca')busca();
  if(a==='usuario'){const email=window.Cloud?.session?.user?.email||'',n=contagens().acessos,wss=window.Cloud?.workspaces||[];
-  drop(`<div class="userhead"><span class="avatar big">${esc(email.slice(0,2).toUpperCase()||'EB')}</span><span><strong>${esc(email||'Modo local')}</strong><small>${window.Cloud?.role==='owner'?'Administrador':'Membro'} · ${esc(window.Cloud?.wsName||'')}</small></span></div>
+  const nomeCompleto=(window.Cloud?.session?.user?.user_metadata?.nome||'').trim();drop(`<div class="userhead"><span class="avatar big">${esc((nomeCompleto||email).slice(0,2).toUpperCase()||'EB')}</span><span><strong>${esc(nomeCompleto||email||'Modo local')}</strong><small>${esc(nomeCompleto?email:'')}</small><small>${window.Cloud?.role==='owner'?'Administrador':'Membro'} · ${esc(window.Cloud?.wsName||'')}</small></span></div>
   <button class="dropitem" data-nav="equipe">${ico('users',18)}<span><strong>Equipe e acessos</strong><small>Liberar usuários e papéis</small></span>${n?`<em class="navcount">${n}</em>`:''}</button>
+  ${window.Cloud?.ws?`<button class="dropitem" data-erp-nome="1">${ico('edit',18)}<span><strong>Alterar meu nome</strong><small>Como você aparece no portal</small></span></button>`:''}
   <button class="dropitem" data-nav="history">${ico('clock',18)}<span><strong>Histórico e auditoria</strong><small>Quem fez o quê, e quando</small></span></button>
   <button class="dropitem" data-nav="integracoes">${ico('plug',18)}<span><strong>Integrações</strong><small>Bling e marketplaces</small></span></button>
   ${wss.length>1?wss.map(w=>`<button class="dropitem" data-erp-ws="${esc(w.id)}">${ico('folder',18)}<span><strong>${esc(w.name)}</strong><small>${w.id===Cloud.ws?'empresa aberta':'trocar para esta empresa'}</small></span></button>`).join(''):''}
@@ -320,3 +323,8 @@ document.addEventListener('change',async e=>{const el=e.target.closest('[data-cf
  const u=ERP.cadUI('fornecedores'),dup=(db.cadastros||[]).filter(c=>c.tipo==='forn').find(c=>c.id!==u.id&&String(c.dados.doc||'').replace(/\D/g,'')===v.num);if(dup){el.classList.add('invalid');return toast(`Já cadastrado: ${dup.dados.fantasia||dup.dados.razao}. Abra a ficha existente em vez de criar outra.`)}
  if(v.tipo==='cpf'){toast('CPF válido. Preencha o nome da pessoa física (a Receita não disponibiliza consulta aberta por CPF).');$('[data-cf="razao"]')?.focus();return}
  if(ultimoDoc===v.num)return;ultimoDoc=v.num;const btn=$('[data-cnpj-buscar]');if(btn)btn.click()});
+
+// Alterar o próprio nome (fica no cadastro do usuário, vale em qualquer computador).
+document.addEventListener('click',async e=>{const b=e.target.closest('[data-erp-nome]');if(!b)return;const atual=window.Cloud?.session?.user?.user_metadata?.nome||'';$('#erpdrop').innerHTML='';
+ modal('Seu nome',`<label for="meuNome">Nome completo</label><input id="meuNome" value="${esc(atual)}" style="width:100%" placeholder="Ex.: Guilherme Klemann"><div class="modalfoot"><button data-action="close">Cancelar</button><button class="primary" id="meuNomeOk">Salvar</button></div>`);
+ $('#meuNomeOk').onclick=async()=>{const nome=$('#meuNome').value.trim();if(!nome)return toast('Informe o nome.');const {data,error}=await Cloud.client.auth.updateUser({data:{nome}});if(error)return toast(error.message);Cloud.session.user=data.user;closeModal();render();toast('Nome atualizado.')}});
