@@ -49,7 +49,7 @@ let flushTimer=null,flushing=null,dirty=false;
 function ensureIds(){for(const i of db.imports)i.id=i.id||uid();for(const a of db.audit)a.id=a.id||uid()}
 function snapshot(){ensureIds();snap={};for(const [k,m] of Object.entries(maps))snap[k]=new Map(listOf[k]().map(x=>[x[m.key],JSON.stringify(m.toRow(x))]));
  snap.crm=new Map(Object.entries(db.crm||{}).map(([id,c])=>[id,JSON.stringify(c)]));snap.accMap=new Map(Object.entries(db.accMap||{}).map(([id,c])=>[id,JSON.stringify(c)]));snap.closures=new Map(Object.entries(db.closures||{}).map(([m,c])=>[m,JSON.stringify(c)]));snap.settings=JSON.stringify(settingsOf())}
-function settingsOf(){return {theme:db.theme,pricing:db.pricing||null}}
+function settingsOf(){return {theme:db.theme,pricing:db.pricing||null,gerencial:db.gerencial||null}}
 
 async function pageAll(table){let out=[],from=0;for(;;){const {data,error}=await sb.from(table).select('*').eq('workspace_id',Cloud.ws).range(from,from+999);if(error)throw error;out.push(...data);if(data.length<1000)return out;from+=1000}}
 
@@ -61,7 +61,7 @@ async function load(){
   crm:Object.fromEntries(crm.map(c=>[c.id,{stage:c.stage,tags:c.tags||[],notes:c.notes||'',interactions:c.interactions||[]}])),
   closures:Object.fromEntries(closures.map(c=>[c.month,c.data])),theme:settings[0]?.data?.theme||db.theme||'dark',schemaVersion:2,
   accLines:accLines.map(maps.accLines.fromRow),accMap:Object.fromEntries(accMap.map(a=>[a.conta,{linha:a.linha,descricao:a.descricao||''}])),accDocs:accDocs.map(maps.accDocs.fromRow),
-  products:products.map(maps.products.fromRow),scenarios:scenarios.map(maps.scenarios.fromRow),pricing:settings[0]?.data?.pricing||undefined};
+  products:products.map(maps.products.fromRow),scenarios:scenarios.map(maps.scenarios.fromRow),pricing:settings[0]?.data?.pricing||undefined,gerencial:settings[0]?.data?.gerencial||undefined};
  db=next;paymentIndex=null;snapshot();Cloud.state='saved';
  document.body.classList.toggle('light',db.theme==='light');
  const months=[...new Set(db.orders.map(o=>o.date.slice(0,7)))].sort();

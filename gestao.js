@@ -14,67 +14,115 @@ const pctf=n=>(Number.isFinite(n)?n:0).toLocaleString('pt-BR',{maximumFractionDi
 const n2=v=>Number(v)||0;
 const monthLabel=m=>new Date(m+'-15T12:00:00').toLocaleDateString('pt-BR',{month:'short',year:'2-digit'});
 const tabs=(id,cur,list)=>`<div class="segtabs" role="tablist">${list.map(([k,l])=>`<button role="tab" class="${cur===k?'active':''}" data-g-tab="${id}:${k}">${l}</button>`).join('')}</div>`;
-const ui={cont:'resultado',prec:'tabela',mapFilter:'pendentes',search:''};
+const ui={cont:'resultado',prec:'tabela',mapFilter:'pendentes',search:'',detalhe:false,modo:'gerencial'};
 function ensure(){db.accLines=db.accLines||[];db.accMap=db.accMap||{};db.accDocs=db.accDocs||[];db.products=db.products||[];db.scenarios=db.scenarios||[];db.pricing=db.pricing||defaultsPricing()}
 
 // ═════════════════════════ CONTABILIDADE E RESULTADO ═════════════════════════
+// Estrutura igual à DRE gerencial montada no Excel da empresa (Resultado.xlsx): grupos, subtotais, EBITDA e EBIT.
 const LINHAS=[
- ['receita','Receita bruta de vendas'],['devolucoes','(−) Devoluções e cancelamentos'],['impostos','(−) Impostos sobre vendas'],
- ['cmv','(−) CMV · custo das mercadorias'],['tarifas','(−) Comissões e tarifas de marketplace'],['fretes','(−) Fretes e logística'],
- ['marketing','(−) Marketing e anúncios'],['pessoal','(−) Pessoal'],['administrativas','(−) Administrativas e ocupação'],
- ['tecnologia','(−) Tecnologia e sistemas'],['outras','(±) Outras operacionais'],['financeiro','(±) Resultado financeiro'],
+ ['receita','Receita bruta com vendas'],['devolucoes','(−) Devoluções, descontos e abatimentos'],['impostos','(−) Tributos e contribuições s/ vendas'],
+ ['cmv','(−) Custo das mercadorias vendidas'],['comerciais','(−) Despesas gerais comerciais'],['trabalhistas','(−) Despesas trabalhistas'],
+ ['administrativas','(−) Despesas gerais administrativas'],['outras','(±) Outras receitas e despesas (tributárias e subvenção)'],
+ ['depreciacao','(−) Depreciações e amortizações'],['rec_fin','(+) Receitas financeiras'],['desp_fin','(−) Despesas financeiras'],
  ['ir','(−) IRPJ e CSLL'],['ignorar','Não entra na DRE (patrimonial/transitória)']];
 const LNAME=Object.fromEntries(LINHAS);
-const DRE=[ // [chave, rótulo, tipo] — tipo "linha" soma contas; "total" soma o que veio antes
- ['receita','Receita bruta de vendas','linha'],['devolucoes','(−) Devoluções e cancelamentos','linha'],['impostos','(−) Impostos sobre vendas','linha'],
+const DRE=[ // [chave, rótulo, tipo, partes] — "linha" soma contas; "total" soma as partes
+ ['receita','Receita bruta com vendas','linha'],['devolucoes','(−) Devoluções, descontos e abatimentos','linha'],['impostos','(−) Tributos e contribuições s/ vendas','linha'],
  ['=rl','Receita líquida','total',['receita','devolucoes','impostos']],
- ['cmv','(−) CMV','linha'],['=lb','Lucro bruto','total',['=rl','cmv']],
- ['tarifas','(−) Comissões e tarifas de marketplace','linha'],['fretes','(−) Fretes e logística','linha'],['marketing','(−) Marketing e anúncios','linha'],
- ['=mc','Margem de contribuição','total',['=lb','tarifas','fretes','marketing']],
- ['pessoal','(−) Pessoal','linha'],['administrativas','(−) Administrativas e ocupação','linha'],['tecnologia','(−) Tecnologia e sistemas','linha'],['outras','(±) Outras operacionais','linha'],
- ['=ebitda','EBITDA','total',['=mc','pessoal','administrativas','tecnologia','outras']],
- ['financeiro','(±) Resultado financeiro','linha'],['=lair','Resultado antes do IR/CSLL','total',['=ebitda','financeiro']],
+ ['cmv','(−) Custo das mercadorias vendidas','linha'],['=mb','Margem bruta','total',['=rl','cmv']],
+ ['comerciais','(−) Despesas gerais comerciais','linha'],['trabalhistas','(−) Despesas trabalhistas','linha'],['administrativas','(−) Despesas gerais administrativas','linha'],
+ ['outras','(±) Outras receitas e despesas','linha'],
+ ['=ebitda','EBITDA','total',['=mb','comerciais','trabalhistas','administrativas','outras']],
+ ['depreciacao','(−) Depreciações e amortizações','linha'],['=ebit','EBIT','total',['=ebitda','depreciacao']],
+ ['rec_fin','(+) Receitas financeiras','linha'],['desp_fin','(−) Despesas financeiras','linha'],
+ ['=lair','Lucro antes do IRPJ/CSLL','total',['=ebit','rec_fin','desp_fin']],
  ['ir','(−) IRPJ e CSLL','linha'],['=ll','Lucro líquido','total',['=lair','ir']]];
-const KW=[['financeiro',/juro|financeir|banc[aá]ri|iof|rendiment|desconto (obtido|concedido)|antecipa|varia[cç][aã]o cambial/],['ir',/irpj|csll|imposto de renda|contribui[cç][aã]o social/],
- ['devolucoes',/devolu|cancelament|abatiment/],['cmv',/\bcmv\b|custo d[ao]s? (mercadoria|produto)|custo das vendas|custo dos produtos vendidos/],
- ['impostos',/icms|\bpis\b|cofins|simples nacional|guia das|^das\b|\bdas (simples|mensal)|\biss\b|difal|impostos? sobre (vendas|faturamento)|dedu[cç]/],['receita',/receita|venda de (mercadoria|produto)|faturamento/],
- ['tarifas',/comiss|tarifa|mercado ?livre|shopee|magalu|marketplace|intermedia/],['fretes',/frete|transporte|correios|log[ií]stic|envio|entrega/],
- ['marketing',/marketing|propaganda|publicidade|an[uú]ncio|\bads\b|patroc[ií]n|influenc/],['pessoal',/sal[aá]rio|pr[oó].?labore|inss|fgts|f[eé]rias|13[ºo°]?|vale.?(transp|refei|alim)|benef[ií]c|encargos? soc|rescis/],
- ['tecnologia',/software|sistema|licen[cç]a|internet|hospedagem|tecnologia|\bbling\b|assinatura/],
- ['administrativas',/aluguel|energia|[aá]gua|telefon|contab|honor[aá]rio|limpeza|material|manuten|seguro|condom[ií]n|despesas? (gera|admin)|correspond|cart[oó]rio/]];
-function suggest(conta,desc){const d=normalized(desc);for(const [l,re] of KW)if(re.test(d))return l;const c=String(conta).replace(/\D/g,'');if(/^[12]/.test(c))return 'ignorar';return 'outras'}
+// Sugestão pela classificação do plano de contas do escritório (mais confiável) e, na falta, pela descrição.
+const PREFIX=[['3.1.01','receita'],['3.1.02.01','devolucoes'],['3.1.02','impostos'],['3.1.03','rec_fin'],['3.1.05','outras'],['3','outras'],
+ ['4.1','cmv'],['4.2.01.03.012','depreciacao'],['4.2.01','comerciais'],['4.2.02.01','trabalhistas'],['4.2.02.02','trabalhistas'],['4.2.02','administrativas'],
+ ['4.2.03','desp_fin'],['4.2.04','outras'],['4.2.06','outras'],['4.3','ir'],['4','outras'],['1','ignorar'],['2','ignorar']];
+const KW=[['depreciacao',/deprecia|amortiza/],['ir',/irpj|csll|imposto de renda|contribui[cç][aã]o social/],['desp_fin',/juros passivos|despesas? banc|tarifas? banc/],['rec_fin',/rendiment|juros ativos|descontos? obtidos?/],
+ ['devolucoes',/devolu|abatiment/],['cmv',/\bcmv\b|custo d[ao]s? (mercadoria|produto)|custo das vendas/],['impostos',/icms s|\bpis s|cofins s|simples nacional|difal/],['receita',/receita (bruta|de vendas|com vendas)|revenda de mercad|venda de mercad/],
+ ['trabalhistas',/sal[aá]rio|pr[oó].?labore|\binss\b|fgts|f[eé]rias|encargos? soc/],['comerciais',/frete|e-?commerce|comiss|propaganda|publicidade|marketing|alugu[eé]l/]];
+function suggest(conta,desc){const c=String(conta).trim();for(const [p,l] of PREFIX)if(c===p||c.startsWith(p+'.'))return l;const d=normalized(desc);for(const [l,re] of KW)if(re.test(d))return l;return /^[12]/.test(c)?'ignorar':'outras'}
+const ehTarifa=d=>/e-?commerce|comiss|tarifa|marketplace|mercado ?livre|shopee|magalu/.test(normalized(d));
+// Ajustes da visão gerencial: contas excluídas e lançamentos gerenciais (ficam nas premissas do workspace).
+const G=()=>{db.gerencial=db.gerencial||{excluir:{},ajustes:[]};db.gerencial.excluir=db.gerencial.excluir||{};db.gerencial.ajustes=db.gerencial.ajustes||[];return db.gerencial};
 
 // Contas analíticas (folhas): exclui as sintéticas para não somar duas vezes.
 function leaves(lines){const codes=[...new Set(lines.map(l=>String(l.conta)))];const norm=c=>c.replace(/[^0-9A-Za-z]/g,'');const all=codes.map(norm);return new Set(codes.filter(c=>{const n=norm(c);return !all.some(o=>o!==n&&o.startsWith(n))}))}
-// Movimento de resultado por conta no mês: crédito − débito (receitas positivas, despesas negativas).
+// Movimento de resultado por conta no mês: crédito − débito (receitas positivas, despesas negativas), como no Excel.
 function movimentos(m){const bal=db.accLines.filter(l=>l.month===m&&l.kind==='balancete'),src=bal.length?bal:db.accLines.filter(l=>l.month===m&&l.kind==='razao');const lv=leaves(src);const out={};
  for(const l of src){if(!lv.has(String(l.conta)))continue;const o=out[l.conta]||(out[l.conta]={conta:l.conta,descricao:l.descricao||'',valor:0});o.valor+=n2(l.credito)-n2(l.debito);if(!o.descricao&&l.descricao)o.descricao=l.descricao}
  for(const o of Object.values(out))o.valor=round(o.valor);return {fonte:bal.length?'balancete':src.length?'razão':'',contas:Object.values(out)}}
-function dreMes(m){const {fonte,contas}=movimentos(m);const v=Object.fromEntries(LINHAS.map(([k])=>[k,0]));let pend=0;
- for(const c of contas){const map=db.accMap[c.conta];const linha=map?.linha||suggest(c.conta,c.descricao);if(!map)pend++;v[linha]+=c.valor}
- for(const [k,,t,parts] of DRE)if(t==='total')v[k]=round(parts.reduce((a,p)=>a+v[p],0));return {fonte,v,pend,contas:contas.length}}
-// DRE estimada pela operação (sem contabilidade do mês): NFs, tarifas das plataformas, custo da tabela de preços, impostos e ads das premissas.
+function totais(v){for(const [k,,t,parts] of DRE)if(t==='total')v[k]=round(parts.reduce((a,p)=>a+v[p],0));for(const k in v)v[k]=round(v[k]);return v}
+function dreMes(m,modo=ui.modo){const {fonte,contas}=movimentos(m);const v=Object.fromEntries(LINHAS.map(([k])=>[k,0])),det={};let pend=0,tarifas=0;const g=G(),ger=modo==='gerencial';
+ for(const c of contas){const map=db.accMap[c.conta];const linha=map?.linha||suggest(c.conta,c.descricao);if(!map&&linha!=='ignorar')pend++;if(ger&&g.excluir[c.conta])continue;v[linha]+=c.valor;if(linha!=='ignorar'&&c.valor)(det[linha]=det[linha]||[]).push(c);if(linha==='comerciais'&&ehTarifa(c.descricao))tarifas+=c.valor}
+ if(ger&&fonte)for(const a of g.ajustes.filter(a=>a.month===m)){v[a.linha]+=n2(a.valor);(det[a.linha]=det[a.linha]||[]).push({conta:'ajuste',descricao:'Ajuste gerencial: '+a.descricao,valor:n2(a.valor)})}
+ return {fonte,v:totais(v),det,pend,contas:contas.length,tarifas:round(tarifas)}}
+// DRE estimada pela operação (sem contabilidade do mês): NFs, tarifas das plataformas, custo da tabela de preços e premissas de Preços.
 function dreOperacao(m){const rows=db.orders.filter(o=>o.date.startsWith(m)),v=Object.fromEntries(LINHAS.map(([k])=>[k,0]));const P=db.pricing,cost=custoMap();let comCusto=0,itens=0;
- v.receita=round(rows.reduce((a,o)=>a+o.gross,0));v.tarifas=-round(rows.reduce((a,o)=>a+(o.feeSource&&o.feeSource!=='Bling'?o.fee:0),0));v.impostos=-round(v.receita*n2(P.impostos)/100);v.marketing=-round(v.receita*n2(P.ads)/100);
+ v.receita=round(rows.reduce((a,o)=>a+o.gross,0));const tar=round(rows.reduce((a,o)=>a+(o.feeSource&&o.feeSource!=='Bling'?o.fee:0),0));v.comerciais=-round(tar+v.receita*n2(P.ads)/100);v.impostos=-round(v.receita*n2(P.impostos)/100);
  let cmv=0;for(const o of rows)for(const it of o.items||[]){itens++;const c=cost.get(normalized(it.sku));if(c){comCusto++;cmv+=n2(it.qty)*(c.custo+c.embalagem)}}v.cmv=-round(cmv);
- for(const [k,,t,parts] of DRE)if(t==='total')v[k]=round(parts.reduce((a,p)=>a+v[p],0));return {fonte:'operação',v,cobertura:itens?comCusto/itens*100:0}}
+ return {fonte:'operação',v:totais(v),det:{},tarifas:-tar,cobertura:itens?comCusto/itens*100:0}}
 const custoMap=()=>new Map(db.products.map(p=>[normalized(p.id),{custo:n2(p.custo),embalagem:n2(p.embalagem)}]));
-const mesesContabeis=()=>[...new Set(db.accLines.map(l=>l.month))].sort();
+const mesesContabeis=()=>[...new Set(db.accLines.map(l=>l.month))].filter(m=>m>='2000').sort();
 
-function contabilView(){ensure();return `${tabs('cont',ui.cont,[['resultado','Resultado gerencial'],['documentos','Documentos do mês'],['plano','Contas → DRE']])}${ui.cont==='documentos'?docsView():ui.cont==='plano'?planoView():resultadoView()}`}
+function contabilView(){ensure();return `${tabs('cont',ui.cont,[['resultado','Resultado'],['visoes','Visões e indicadores'],['documentos','Documentos do mês'],['plano','Contas → DRE']])}${ui.cont==='documentos'?docsView():ui.cont==='plano'?planoView():ui.cont==='visoes'?visoesView():resultadoView()}`}
+const fmtN=x=>x<0?'('+money(-x).replace('R$','').trim()+')':money(x).replace('R$','').trim();
+const serie=(n=12)=>[...new Set([...mesesContabeis(),month])].sort().filter(m=>m<=month).slice(-n).map(m=>{const c=dreMes(m);return [m,c.fonte?c:dreOperacao(m)]});
 
-function resultadoView(){const cont=dreMes(month),usaCont=!!cont.fonte,d=usaCont?cont:dreOperacao(month),v=d.v,rl=v['=rl']||v.receita||1;
- const meses=[...new Set([...mesesContabeis(),month])].sort().slice(-6);const series=meses.map(m=>{const c=dreMes(m);return [m,c.fonte?c:dreOperacao(m)]});
- const ops=db.orders.filter(o=>o.date.startsWith(month)),nfs=round(ops.reduce((a,o)=>a+o.gross,0)),tarOp=round(ops.reduce((a,o)=>a+(o.feeSource&&o.feeSource!=='Bling'?o.fee:0),0)),rec=round(db.receipts.filter(r=>r.date.startsWith(month)).reduce((a,r)=>a+r.amount,0));
+function resultadoView(){const cont=dreMes(month),usaCont=!!cont.fonte,d=usaCont?cont:dreOperacao(month),v=d.v,rb=v.receita||1;
+ const series=serie(12),acum={};for(const [,x] of series)if(x.fonte&&x.fonte!=='operação')for(const [k] of DRE)acum[k]=round((acum[k]||0)+(x.v[k]||0));
  const kp=(l,val,cap,tone='')=>`<div class="card metric"><div class="label">${l}${icon('chart')}</div><div class="value ${tone}">${val}</div><small>${cap}</small></div>`;
- const cell=(x,tot)=>`<td class="num ${x<0?'red':''}">${x<0?'('+money(-x).replace('R$','').trim()+')':money(x).replace('R$','').trim()}</td>`;
- return `<div class="notice">${usaCont?`<strong>Fonte: contabilidade (${cont.fonte}) de ${monthLabel(month)}.</strong> ${cont.pend?`${cont.pend} contas ainda sem classificação confirmada — veja <button class="quiet small" data-g-tab="cont:plano">Contas → DRE</button>.`:'Todas as contas classificadas.'}`:`<strong>Sem contabilidade importada para ${monthLabel(month)}.</strong> Mostrando a DRE <em>estimada pela operação</em>: NFs do Bling, tarifas das plataformas, custo da tabela de preços (${pctf(d.cobertura)} dos itens com custo) e impostos/anúncios das premissas de Preços. Importe o balancete ou o razão em <button class="quiet small" data-g-tab="cont:documentos">Documentos do mês</button>.`}</div>
- <div class="grid metrics">${kp('Receita bruta',money(v.receita),usaCont?'Contábil':'NFs emitidas no Bling')}${kp('Receita líquida',money(v['=rl']),pctf(v['=rl']/(v.receita||1)*100)+' da bruta')}${kp('Margem de contribuição',pctf(v['=mc']/rl*100),money(v['=mc']),v['=mc']<0?'red':'green')}${kp('Lucro líquido',money(v['=ll']),pctf(v['=ll']/rl*100)+' da receita líquida',v['=ll']<0?'red':'green')}</div>
- <div class="grid charts"><div class="tablebox"><div class="tabletop"><h2>DRE gerencial do e-commerce</h2><button class="small" data-g="export-dre">${icon('download')} Exportar</button></div><div class="tablewrap"><table class="dre"><thead><tr><th>Linha</th>${series.map(([m])=>`<th class="num ${m===month?'purple':''}">${monthLabel(m)}</th>`).join('')}<th class="num">% RL</th></tr></thead><tbody>${DRE.map(([k,l,t])=>`<tr class="${t==='total'?'total':''}"><td>${l}</td>${series.map(([,x])=>cell(x.v[k]||0)).join('')}<td class="num caption">${pctf((v[k]||0)/rl*100)}</td></tr>`).join('')}</tbody></table></div></div>
- <div class="stack"><div class="card"><div class="cardhead"><h2>Contabilidade × operação</h2>${icon('link')}</div>
- ${[['Receita contábil',usaCont?cont.v.receita:null,'NFs no Bling',nfs],['Tarifas contábeis',usaCont?-(cont.v.tarifas):null,'Tarifas das plataformas',tarOp]].map(([a,av,b,bv])=>`<div class="listline"><span>${a}</span><strong>${av==null?'—':money(av)}</strong></div><div class="listline"><span>${b}</span><strong>${money(bv)}</strong></div>${av!=null?`<div class="listline"><span>Diferença</span><strong class="${Math.abs(av-bv)>1?'gold':'green'}">${money(av-bv)}</strong></div>`:''}`).join('<div style="height:8px"></div>')}
- <div class="listline"><span>Repasses recebidos no mês</span><strong>${money(rec)}</strong></div><p class="caption">Diferenças costumam vir de competência (NF × lançamento), devoluções e tarifas lançadas por extrato.</p></div>
- <div class="card"><div class="cardhead"><h2>Evolução</h2>${icon('chart')}</div>${bars(series.map(([m,x])=>[monthLabel(m),x.v['=rl'],x.v['=ll']]))}</div></div></div>`}
+ const cell=x=>`<td class="num ${x<0?'red':''}">${Math.abs(x)<0.005?'<span class="caption">–</span>':fmtN(x)}</td>`;
+ const contasDe=k=>{const m=new Map();for(const [,x] of series)for(const c of x.det?.[k]||[])m.set(c.conta+'|'+c.descricao,[c.conta,c.descricao]);return [...m.values()]};
+ const valorConta=(x,k,conta,desc)=>(x.det?.[k]||[]).filter(c=>c.conta===conta&&c.descricao===desc).reduce((a,c)=>a+c.valor,0);
+ const linhas=DRE.flatMap(([k,l,t])=>{const row=`<tr class="${t==='total'?'total':'grupo'}"><td>${l}</td>${series.map(([,x])=>cell(x.v[k]||0)).join('')}<td class="num">${fmtN(acum[k]||0)}</td><td class="num caption">${pctf((v[k]||0)/rb*100)}</td></tr>`;
+  if(t==='total'||!ui.detalhe)return [row];return [row,...contasDe(k).map(([conta,desc])=>`<tr class="conta"><td>${esc(desc.trim())} <span class="caption">${conta==='ajuste'?'':esc(conta)}</span></td>${series.map(([,x])=>cell(valorConta(x,k,conta,desc))).join('')}<td class="num">${fmtN(round(series.filter(([,x])=>x.fonte!=='operação').reduce((a,[,x])=>a+valorConta(x,k,conta,desc),0)))}</td><td></td></tr>`)]});
+ const g=G(),exc=Object.keys(g.excluir).filter(k=>g.excluir[k]);
+ return `<div class="row wrap" style="justify-content:space-between;margin-bottom:14px">${tabs('modo',ui.modo,[['contabil','DRE contábil'],['gerencial','DRE gerencial']])}<span class="caption">${ui.modo==='gerencial'?`Gerencial: ${exc.length} conta(s) excluída(s) e ${g.ajustes.length} ajuste(s) — edite abaixo.`:'Contábil: exatamente o balancete do escritório.'}</span></div>
+ <div class="notice">${usaCont?`<strong>Fonte: contabilidade (${cont.fonte}) de ${monthLabel(month)}.</strong> Movimento do mês de cada conta (crédito − débito), na estrutura da DRE gerencial do Excel. ${cont.pend?`${cont.pend} contas ainda sem classificação confirmada — veja <button class="quiet small" data-g-tab="cont:plano">Contas → DRE</button>.`:'Todas as contas classificadas.'}`:`<strong>Sem contabilidade importada para ${monthLabel(month)}.</strong> DRE <em>estimada pela operação</em>: NFs do Bling, tarifas das plataformas, custo da tabela de preços (${pctf(d.cobertura)} dos itens com custo) e premissas de Preços.`}</div>
+ <div class="grid metrics">${kp('Receita bruta',money(v.receita),usaCont?'Contábil':'NFs emitidas no Bling')}${kp('Margem bruta',pctf(v['=mb']/rb*100),money(v['=mb']),v['=mb']<0?'red':'green')}${kp('EBITDA',money(v['=ebitda']),pctf(v['=ebitda']/rb*100)+' da receita bruta',v['=ebitda']<0?'red':'green')}${kp('Lucro líquido',money(v['=ll']),pctf(v['=ll']/rb*100)+' da receita bruta',v['=ll']<0?'red':'green')}</div>
+ <div class="tablebox" style="margin-bottom:22px"><div class="tabletop"><h2>DRE ${ui.modo==='gerencial'?'gerencial':'contábil'} do e-commerce</h2><div class="row wrap"><button class="small ${ui.detalhe?'primary':''}" data-g="toggle-detalhe">${ui.detalhe?'Ocultar contas':'Mostrar contas'}</button><button class="small" data-g="export-dre">${icon('download')} Exportar</button></div></div><div class="tablewrap"><table class="dre"><thead><tr><th>Linha</th>${series.map(([m,x])=>`<th class="num ${m===month?'purple':''}">${monthLabel(m)}${x.fonte==='operação'?'<br><span class="caption">estimada</span>':''}</th>`).join('')}<th class="num">Acumulado<br><span class="caption">contábil</span></th><th class="num">% RB</th></tr></thead><tbody>${linhas.join('')}</tbody></table></div></div>
+ ${ui.modo==='gerencial'?ajustesView():''}
+ <div class="grid charts"><div class="card"><div class="cardhead"><h2>Cascata de ${monthLabel(month)}</h2>${icon('chart')}</div>${cascata(v)}</div>
+ <div class="card"><div class="cardhead"><h2>Contabilidade × operação</h2>${icon('link')}</div>${confronto(cont,usaCont)}</div></div>`}
+
+function confronto(cont,usaCont){const ops=db.orders.filter(o=>o.date.startsWith(month)),nfs=round(ops.reduce((a,o)=>a+o.gross,0)),tarOp=round(ops.reduce((a,o)=>a+(o.feeSource&&o.feeSource!=='Bling'?o.fee:0),0)),rec=round(db.receipts.filter(r=>r.date.startsWith(month)).reduce((a,r)=>a+r.amount,0));
+ return `${[['Receita contábil',usaCont?cont.v.receita:null,'NFs no Bling',nfs],['Despesas c/ e-commerce (contábil)',usaCont?-(cont.tarifas):null,'Tarifas das plataformas',tarOp]].map(([a,av,b,bv])=>`<div class="listline"><span>${a}</span><strong>${av==null?'—':money(av)}</strong></div><div class="listline"><span>${b}</span><strong>${money(bv)}</strong></div>${av!=null?`<div class="listline"><span>Diferença</span><strong class="${Math.abs(av-bv)>1?'gold':'green'}">${money(av-bv)}</strong></div>`:''}`).join('<div style="height:8px"></div>')}
+ <div class="listline"><span>Repasses recebidos no mês</span><strong>${money(rec)}</strong></div><p class="caption">Diferenças costumam vir de competência (NF × lançamento), devoluções e tarifas lançadas por extrato. A conferência lançamento a lançamento vem com o razão.</p>`}
+
+// Cascata: da receita bruta ao lucro líquido.
+function cascata(v){const passos=[['Receita bruta',v.receita,'base'],['Deduções',v.devolucoes+v.impostos],['CMV',v.cmv],['Comerciais',v.comerciais],['Trabalhistas',v.trabalhistas],['Administrativas',v.administrativas],['Outras',v.outras],['Depreciação',v.depreciacao],['Financeiro',v.rec_fin+v.desp_fin],['IR/CSLL',v.ir],['Lucro líquido',v['=ll'],'base']];
+ let acc=0;const bars=passos.map(([l,x,t])=>{let from,to;if(t){from=0;to=x;acc=x}else{from=acc;to=acc+x;acc=to}return {l,x,from,to,t}});const max=Math.max(1,...bars.map(b=>Math.max(b.from,b.to))),min=Math.min(0,...bars.map(b=>Math.min(b.from,b.to))),H=180,W=bars.length*56,y=val=>H-((val-min)/(max-min))*H;
+ return `<svg viewBox="0 0 ${W} ${H+44}" class="cascata" role="img" aria-label="Cascata da receita bruta ao lucro líquido">${bars.map((b,i)=>{const top=y(Math.max(b.from,b.to)),h=Math.max(1,Math.abs(y(b.from)-y(b.to)));const cor=b.t?(b.x<0?'var(--red)':'var(--accent)'):b.x<0?'var(--red)':'var(--green)';return `<rect x="${i*56+8}" y="${top}" width="40" height="${h}" rx="3" fill="${cor}" opacity="${b.t?1:.8}"><title>${b.l}: ${money(b.x)}</title></rect><text x="${i*56+28}" y="${H+14}" text-anchor="middle">${b.l.split(' ')[0]}</text><text x="${i*56+28}" y="${H+28}" text-anchor="middle" class="${b.x<0?'neg':''}">${Math.abs(b.x)>=1000?(b.x/1000).toFixed(0)+'k':Math.round(b.x)}</text>`}).join('')}<line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line)"/></svg>`}
+
+function ajustesView(){const g=G(),{contas}=movimentos(month),opts=LINHAS.filter(([k])=>k!=='ignorar').map(([k,l])=>`<option value="${k}">${l}</option>`).join('');
+ const exc=contas.filter(c=>(db.accMap[c.conta]?.linha||suggest(c.conta,c.descricao))!=='ignorar');
+ return `<div class="grid two" style="margin-bottom:22px"><div class="card"><div class="cardhead"><div><h2>Contas fora da visão gerencial</h2><p class="caption">Marque o que não deve pesar no resultado gerencial (ex.: perda de crédito de subvenção). A DRE contábil não muda.</p></div></div>
+ <div class="tablewrap" style="max-height:340px"><table><tbody>${exc.sort((a,b)=>String(a.conta).localeCompare(String(b.conta))).map(c=>`<tr><td><label class="row" style="margin:0"><input type="checkbox" class="check" data-g-exc="${esc(c.conta)}" ${g.excluir[c.conta]?'checked':''}> ${esc(c.descricao.trim())}</label><span class="caption">${esc(c.conta)} · ${LNAME[db.accMap[c.conta]?.linha||suggest(c.conta,c.descricao)]}</span></td><td class="num ${c.valor<0?'red':''}">${fmtN(c.valor)}</td></tr>`).join('')}</tbody></table></div></div>
+ <div class="card"><div class="cardhead"><div><h2>Lançamentos gerenciais de ${monthLabel(month)}</h2><p class="caption">Inclua o que a contabilidade não reflete como você quer ver (valores negativos = despesa).</p></div></div>
+ ${g.ajustes.filter(a=>a.month===month).map(a=>`<div class="listline"><span>${esc(a.descricao)}<br><span class="caption">${LNAME[a.linha]}</span></span><div class="row"><strong class="${a.valor<0?'red':'green'}">${money(a.valor)}</strong><button class="small quiet" data-g-delaj="${esc(a.id)}" aria-label="Remover">${icon('trash')}</button></div></div>`).join('')||'<p class="caption">Nenhum ajuste neste mês.</p>'}
+ <div class="grid two" style="margin-top:12px"><div><label for="ajLinha">Linha da DRE</label><select id="ajLinha" style="width:100%">${opts}</select></div><div><label for="ajValor">Valor (R$)</label><input id="ajValor" type="text" placeholder="-1.500,00" style="width:100%"></div></div>
+ <label for="ajDesc">Descrição</label><input id="ajDesc" style="width:100%" placeholder="Ex.: rateio de despesas da matriz">
+ <div class="row" style="margin-top:12px"><button class="primary small" data-g="aj-add">${icon('check')} Incluir ajuste</button><button class="small" data-g="aj-copy">Repetir ajustes do mês anterior</button></div></div></div>`}
+
+// Visões e indicadores: análise vertical e horizontal, margens no tempo, composição das despesas e ponto de equilíbrio.
+function visoesView(){const s=serie(12).filter(([,x])=>x.fonte!=='operação');if(!s.length)return `<div class="empty">Importe os balancetes para ver as visões.</div>`;
+ const [mAtual,x]=s[s.length-1],ant=s.length>1?s[s.length-2][1]:null,v=x.v,rb=v.receita||1;
+ const ind=[['Margem bruta','=mb'],['EBITDA','=ebitda'],['Lucro líquido','=ll'],['CMV','cmv'],['Despesas comerciais','comerciais'],['Tributos s/ vendas','impostos']];
+ const lin=(k,cor)=>{const pts=s.map(([,y],i)=>[i,(y.v.receita?y.v[k]/y.v.receita*100:0)]);return pts};
+ const W=560,H=190,all=ind.slice(0,3).flatMap(([,k])=>lin(k).map(p=>p[1])),mx=Math.max(10,...all),mn=Math.min(0,...all),px=i=>30+i*((W-50)/Math.max(1,s.length-1)),py=p=>H-20-((p-mn)/(mx-mn))*(H-40);
+ const cores=['var(--accent)','var(--green)','var(--gold)'];
+ const grafico=`<svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Margens em % da receita bruta por mês"><line x1="30" x2="${W-20}" y1="${py(0)}" y2="${py(0)}" stroke="var(--line)"/>${ind.slice(0,3).map(([l,k],j)=>`<polyline fill="none" stroke="${cores[j]}" stroke-width="2.5" points="${lin(k).map(([i,p])=>px(i)+','+py(p)).join(' ')}"/>${lin(k).map(([i,p])=>`<circle cx="${px(i)}" cy="${py(p)}" r="3" fill="${cores[j]}"><title>${l} · ${monthLabel(s[i][0])}: ${pctf(p)}</title></circle>`).join('')}`).join('')}${s.map(([m],i)=>`<text x="${px(i)}" y="${H-4}" text-anchor="middle">${monthLabel(m)}</text>`).join('')}</svg><div class="legend">${ind.slice(0,3).map(([l],j)=>`<span><i style="background:${cores[j]}"></i>${l}</span>`).join('')}</div>`;
+ const fixos=-(v.trabalhistas+v.administrativas+(v.depreciacao||0))+Math.max(0,-(x.det.comerciais||[]).filter(c=>/alugu/.test(normalized(c.descricao))).reduce((a,c)=>a+c.valor,0));
+ const mcPct=(v['=mb']+v.comerciais+Math.max(0,-(x.det.comerciais||[]).filter(c=>/alugu/.test(normalized(c.descricao))).reduce((a,c)=>a+c.valor,0)))/rb;
+ const pe=mcPct>0?fixos/mcPct:null;
+ const despesas=['cmv','impostos','comerciais','trabalhistas','administrativas','outras'].map(k=>[LNAME[k].replace(/^\(.\)\s*/,''),-v[k]]).filter(([,val])=>val>0);
+ return `<div class="grid metrics">${ind.map(([l,k])=>{const p=v[k]/rb*100,pa=ant&&ant.v.receita?ant.v[k]/ant.v.receita*100:null;return `<div class="card metric"><div class="label">${l} · % da receita</div><div class="value ${p<0&&k.startsWith('=')?'red':''}">${pctf(p)}</div><small>${pa==null?monthLabel(mAtual):`${p-pa>=0?'▲':'▼'} ${pctf(Math.abs(p-pa))} p.p. vs mês anterior`}</small></div>`}).join('')}${pe?`<div class="card metric"><div class="label">Ponto de equilíbrio</div><div class="value">${money(pe)}</div><small>Receita bruta mínima com a estrutura de ${monthLabel(mAtual)}</small></div>`:''}<div class="card metric"><div class="label">Custos fixos do mês</div><div class="value">${money(fixos)}</div><small>Pessoal, administrativas, aluguel e depreciação</small></div></div>
+ <div class="grid charts"><div class="card"><div class="cardhead"><h2>Margens mês a mês</h2>${icon('chart')}</div>${grafico}</div><div class="card"><div class="cardhead"><h2>Para onde vai cada R$ 100 vendidos · ${monthLabel(mAtual)}</h2></div>${despesas.map(([l,val])=>`<div class="hbar"><span class="hbarlabel">${l}</span><strong>R$ ${(val/rb*100).toFixed(2).replace('.',',')}</strong><div class="bar"><i style="width:${Math.min(100,val/rb*100)}%;background:var(--accent)"></i></div></div>`).join('')}<div class="hbar"><span class="hbarlabel"><strong>Sobra (lucro líquido)</strong></span><strong class="${v['=ll']<0?'red':'green'}">R$ ${(v['=ll']/rb*100).toFixed(2).replace('.',',')}</strong><div class="bar"><i style="width:${Math.max(0,v['=ll']/rb*100)}%;background:var(--green)"></i></div></div></div></div>
+ <div class="tablebox"><div class="tabletop"><h2>Análise vertical e horizontal</h2><span class="caption">AV = % da receita bruta · AH = variação vs mês anterior</span></div><div class="tablewrap"><table class="dre"><thead><tr><th>Linha</th>${s.map(([m])=>`<th class="num">${monthLabel(m)}</th><th class="num caption">AV</th>`).join('')}<th class="num">AH</th></tr></thead><tbody>${DRE.map(([k,l,t])=>`<tr class="${t==='total'?'total':'grupo'}"><td>${l}</td>${s.map(([,y])=>`<td class="num ${y.v[k]<0?'red':''}">${fmtN(y.v[k]||0)}</td><td class="num caption">${y.v.receita?pctf((y.v[k]||0)/y.v.receita*100):'–'}</td>`).join('')}<td class="num">${ant&&ant.v[k]?pctf(((v[k]||0)-ant.v[k])/Math.abs(ant.v[k])*100):'–'}</td></tr>`).join('')}</tbody></table></div></div>`}
 function bars(rows){const max=Math.max(1,...rows.flatMap(r=>[Math.abs(r[1]),Math.abs(r[2])]));return `<div class="colchart">${rows.map(([l,a,b])=>`<div class="col"><div class="colbars"><i style="height:${Math.abs(a)/max*100}%;background:var(--accent)" title="Receita líquida ${money(a)}"></i><i style="height:${Math.abs(b)/max*100}%;background:${b<0?'var(--red)':'var(--green)'}" title="Lucro líquido ${money(b)}"></i></div><span>${l}</span></div>`).join('')}</div><div class="legend"><span><i style="background:var(--accent)"></i>Receita líquida</span><span><i style="background:var(--green)"></i>Lucro líquido</span></div>`}
 
 const DOCS=[['razao','Razão de todas as contas','Planilha ou PDF',true],['balancete','Balancete','Planilha ou PDF (importável)',true],['dre','DRE do escritório','PDF',false],['outros','Outros (apurações, guias, folha…)','Qualquer arquivo',false]];
@@ -187,7 +235,8 @@ addPage('precos','tag','Preços e Simulador',precosView,'Custos, regras de cada 
 function bindGestao(){const s=$('#gSearch');if(s)s.oninput=e=>{ui.search=e.target.value;const pos=e.target.selectionStart;render();const a=$('#gSearch');a.focus();try{a.setSelectionRange(pos,pos)}catch{}};
  const mf=$('#gMapFilter');if(mf)mf.onchange=e=>{ui.mapFilter=e.target.value;render()};
  $$('[data-g-map]').forEach(x=>x.onchange=()=>{db.accMap[x.dataset.gMap]={linha:x.value,descricao:x.dataset.desc};save();if(ui.mapFilter==='pendentes')render()});
- $$('[data-g-attach]').forEach(x=>x.onchange=e=>attach(x.dataset.gAttach,e.target.files[0]));
+ $('[data-g-exc]').forEach(x=>x.onchange=()=>{G().excluir[x.dataset.gExc]=x.checked;audit('Visão gerencial',(x.checked?'Excluída':'Incluída de volta')+' a conta '+x.dataset.gExc);render()});
+ $('[data-g-attach]').forEach(x=>x.onchange=e=>attach(x.dataset.gAttach,e.target.files[0]));
  $$('[data-g-rule]').forEach(x=>x.onchange=()=>{setPath(db.pricing,x.dataset.gRule,x.type==='checkbox'?x.checked:n2(x.value));save()});
  $$('[data-s]').forEach(x=>x.oninput=()=>onSim(x));
  const sk=$('#sSku');if(sk)sk.onchange=e=>{sim.sku=e.target.value;sim.preco=0;sim.over={};render()};
@@ -196,6 +245,7 @@ function bindGestao(){const s=$('#gSearch');if(s)s.oninput=e=>{ui.search=e.targe
 
 document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;const d=b.dataset;
  if(d.gTab){const [g,k]=d.gTab.split(':');ui[g]=k;ui.search='';closeModal();if(g==='cont'&&page!=='contabil')navigate('contabil');render();return}
+ if(d.gDelaj){G().ajustes=G().ajustes.filter(a=>a.id!==d.gDelaj);save();render();return}
  if(d.gImport){importAccounting(d.gImport);return}
  if(d.gClear){modal('Limpar importação',`<p>Remover as linhas de ${d.gClear==='razao'?'razão':'balancete'} de ${monthLabel(month)}? Você pode importar de novo depois.</p><div class="modalfoot"><button data-action="close">Cancelar</button><button class="primary" data-g-clearok="${d.gClear}">Remover</button></div>`);return}
  if(d.gClearok){db.accLines=db.accLines.filter(l=>!(l.month===month&&l.kind===d.gClearok));audit('Importação contábil removida',`${d.gClearok} · ${month}`);closeModal();render();return}
@@ -204,8 +254,11 @@ document.addEventListener('click',async e=>{const b=e.target.closest('button');i
  if(d.gLoad){const s=db.scenarios.find(x=>x.id===d.gLoad);Object.assign(sim,JSON.parse(JSON.stringify(s.data)));if(s.data.g)Object.assign(db.pricing,{impostos:s.data.g.impostos,ads:s.data.g.ads,fixos:s.data.g.fixos});ui.prec='simulador';render();toast('Cenário carregado.');return}
  if(d.gDelsc){db.scenarios=db.scenarios.filter(x=>x.id!==d.gDelsc);save();render();return}
  switch(d.g){
+  case'toggle-detalhe':ui.detalhe=!ui.detalhe;render();break;
+  case'aj-add':{const valor=TableImport.num($('#ajValor').value),desc=$('#ajDesc').value.trim();if(!valor||!desc)return toast('Informe descrição e valor.');G().ajustes.push({id:uid(),month,linha:$('#ajLinha').value,descricao:desc,valor:round(valor)});audit('Ajuste gerencial incluído',month+' · '+desc+' · '+money(valor));render();break}
+  case'aj-copy':{const [y,mm]=month.split('-').map(Number),prev=new Date(y,mm-2,15).toLocaleDateString('sv-SE').slice(0,7),src=G().ajustes.filter(a=>a.month===prev);if(!src.length)return toast('O mês anterior não tem ajustes.');for(const a of src)G().ajustes.push({...a,id:uid(),month});audit('Ajustes gerenciais repetidos',prev+' → '+month);render();break}
   case'accept-all':{const {contas}=movimentos(month);let n=0;for(const c of contas)if(!db.accMap[c.conta]){db.accMap[c.conta]={linha:suggest(c.conta,c.descricao),descricao:c.descricao};n++}audit('Classificação contábil confirmada',`${n} contas · ${month}`);render();toast(`${n} contas classificadas.`);break}
-  case'export-dre':{const meses=[...new Set([...mesesContabeis(),month])].sort().slice(-12),ss=meses.map(m=>{const c=dreMes(m);return c.fonte?c:dreOperacao(m)});exportCsv(`DRE_gerencial_${month}`,[['linha',...meses.map(m=>m+(dreMes(m).fonte?'':' (estimada)'))],...DRE.map(([k,l])=>[l,...ss.map(x=>x.v[k]||0)])]);break}
+  case'export-dre':{const meses=[...new Set([...mesesContabeis(),month])].sort().slice(-12),ss=meses.map(m=>{const c=dreMes(m);return c.fonte?c:dreOperacao(m)});exportCsv(`DRE_${ui.modo}_${month}`,[['linha',...meses.map(m=>m+(dreMes(m).fonte?'':' (estimada)'))],...DRE.map(([k,l])=>[l,...ss.map(x=>x.v[k]||0)])]);break}
   case'import-precos':importPrecos();break;
   case'add-vendidos':{let n=0;for(const v of vendidos().values()){if(!v.sku||db.products.some(p=>normalized(p.id)===normalized(v.sku)))continue;db.products.push({id:v.sku,nome:v.nome,custo:0,embalagem:0,precos:Object.fromEntries(Object.entries(v.canais).map(([c,x])=>[c,round(x.receita/x.qtd)]))});n++}audit('SKUs vendidos adicionados à tabela de preços',`${n} produtos (preço = média vendida; custo a preencher)`);render();toast(`${n} SKUs adicionados. Preencha os custos importando sua planilha.`);break}
   case'export-precos':{const ch=CANAIS.filter(c=>db.pricing.canais[c]?.ativo);exportCsv('tabela_de_precos',[['sku','produto','custo','embalagem',...ch.flatMap(c=>[`${c} preço`,`${c} margem %`,`${c} mínimo`,`${c} sugerido`])],...db.products.map(p=>[p.id,p.nome,p.custo,p.embalagem,...ch.flatMap(c=>{const cc=db.pricing.canais[c],pr=n2(p.precos?.[c]),r=calc(pr,cc,p);return [pr||'',pr?round(r.margem):'',precoPara(0,cc,p),precoPara(db.pricing.margemAlvo,cc,p)]})])]);break}
