@@ -19,7 +19,7 @@ const C=tipo=>(db.cadastros||(db.cadastros=[])).filter(c=>c.tipo===tipo);
 // ═════════════════ Estrutura ═════════════════
 const MODS=[
  {id:'ini',ic:'home',t:'Início',grupos:[['Hoje',['central']]]},
- {id:'ven',ic:'link',t:'Vendas e conciliação',grupos:[['Painel',['dashboard']],['Conciliação',['reconcile','pending','closing']],['Integração',['integracoes','imports']]],plataformas:true},
+ {id:'ven',ic:'link',t:'Vendas',grupos:[['Painel',['dashboard']],['Conciliação',['reconcile','pending','closing']],['Integração',['integracoes','imports']]],plataformas:true},
  {id:'fin',ic:'wallet',t:'Financeiro',grupos:[['Contas a pagar',['lancamento','pagar','compras']],['Tesouraria',['tesouraria','concbanco']],['Caixa',['fluxo']]]},
  {id:'cad',ic:'folder',t:'Cadastros',grupos:[['Parceiros',['fornecedores','clientes']],['Financeiro',['cadcontas','categorias','centros']],['Produtos',['cadprodutos']]]},
  {id:'res',ic:'chart',t:'Resultado',grupos:[['Contábil',['contabil']],['Análise de vendas',['produtos','estados']]]},
@@ -28,6 +28,9 @@ const MODS=[
 const GERAL=['equipe','ai','history'];
 const modDe=p=>platforms[p]?'ven':MODS.find(m=>m.grupos.some(([,ids])=>ids.includes(p)))?.id;
 let modAtual=modDe(page)||'ini';
+const menuAberto=new Set((()=>{try{return JSON.parse(localStorage.getItem('eb_menu')||'[]')}catch{return []}})());
+const menuFechado=new Set();
+const salvarMenu=()=>{try{localStorage.setItem('eb_menu',JSON.stringify([...menuAberto]))}catch{}};
 const nomePag=id=>navItems.find(n=>n[0]===id)?.[2]||(platforms[id]?id:id);
 const ico=(n,s=18)=>icon(n).replace('class="icon"',`class="icon" style="width:${s}px;height:${s}px"`);
 function contagens(){const h=hoje(),ab=abertos();return {vencidos:ab.filter(t=>t.vencimento<h),hoje:ab.filter(t=>t.vencimento===h),extrato:(db.bankTx||[]).filter(t=>t.status==='pendente').length,acessos:(window.Integrations?.state?.reqs||[]).length,notas:(db.purchases||[]).filter(n=>n.emissao&&n.emissao>=addDias(h,-3)&&n.tipo==='compra').length}}
@@ -45,18 +48,15 @@ shell=function(){const pm=modDe(page);if(pm)modAtual=pm;const M=MODS.find(m=>m.i
  const meses=[...new Set([month,...db.orders.map(o=>o.date.slice(0,7)),...P().map(t=>t.vencimento.slice(0,7))])].filter(m=>m>='2020').sort().reverse().slice(0,36);
  const emp=esc(window.Cloud?.wsName||'Minha empresa');
  $('#app').innerHTML=`<div class="erp">
- <nav class="rail" aria-label="Módulos"><button class="railbrand" data-nav="central" aria-label="Início">EB</button>
-  ${MODS.map(m=>`<button class="railbtn ${m.id===M.id?'on':''}" data-mod="${m.id}" aria-label="${m.t}" title="${m.t}">${ico(m.ic,21)}<span>${m.t.split(' ')[0]}</span></button>`).join('')}
-  <div style="flex:1"></div><button class="railbtn" data-action="theme" aria-label="Alternar tema" title="Tema claro / escuro">${ico(db.theme==='light'?'moon':'sun',19)}</button></nav>
- <aside class="subnav"><div class="complogo"><img src="brand/comprastore-transparente.png" alt="${emp}"></div>
-  <div class="subtitle">${esc(M.t)}</div>
-  ${M.grupos.map(([g,ids])=>`<div class="navlabel">${g}</div><nav>${ids.map(item).join('')}</nav>`).join('')}
-  ${M.plataformas?`<div class="navlabel">Por plataforma</div><nav>${Object.keys(platforms).map(p=>`<button data-nav="${p}" class="${page===p?'active':''}"><span class="platdot" style="background:${platforms[p].color}"></span><span>${p}</span></button>`).join('')}</nav>`:''}
-  <div style="flex:1"></div><div class="navlabel">Geral</div><nav>${GERAL.map(item).join('')}</nav></aside>
+ <aside class="side"><button class="sidebrand" data-nav="central" aria-label="Início"><img src="brand/comprastore-transparente.png" alt="${emp}"><span><strong>EcomBalance</strong><small>ERP do e-commerce</small></span></button>
+  <nav class="menu" aria-label="Menu principal">${MODS.map(m=>{const ids=m.grupos.flatMap(([,l])=>l).filter(id=>navItems.some(n=>n[0]===id)),unico=ids.length===1&&!m.plataformas,ativo=m.id===M.id,aberto=menuAberto.has(m.id)||(ativo&&!menuFechado.has(m.id));
+   if(unico)return `<button class="mhead ${page===ids[0]?'active':''}" data-nav="${ids[0]}">${ico(m.ic,19)}<span>${m.t}</span></button>`;
+   return `<div class="mgroup ${aberto?'open':''} ${ativo?'cur':''}"><button class="mhead" data-mtoggle="${m.id}" aria-expanded="${aberto}">${ico(m.ic,19)}<span>${m.t}</span>${ico('chev',15)}</button>${aberto?`<div class="mitems">${m.grupos.map(([g,l])=>`${m.grupos.length>1?`<div class="mlabel">${g}</div>`:''}${l.map(item).join('')}`).join('')}${m.plataformas?`<div class="mlabel">Por plataforma</div>${Object.keys(platforms).map(p=>`<button data-nav="${p}" class="${page===p?'active':''}"><span class="platdot" style="background:${platforms[p].color}"></span><span>${p}</span></button>`).join('')}`:''}</div>`:''}</div>`}).join('')}</nav>
+  <nav class="menu menufoot">${GERAL.filter(id=>id!=='equipe').map(item).join('')}</nav></aside>
  <main><header><button class="quiet mobilemenu" data-action="menu" aria-label="Abrir navegação">${icon('menu')}</button>
   <button class="wschip" data-erp="empresa" title="Empresa"><span class="wsmark">${emp.slice(0,2).toUpperCase()}</span><span class="wsname">${emp}</span></button>
   <button class="searchbox" data-erp="busca">${ico('search',16)}<span>Buscar pedido, nota, fornecedor, título…</span><kbd>Ctrl K</kbd></button>
-  <div class="row hdrright" style="margin-left:auto"><button class="primary newbtn" data-erp="novo">${ico('plus',16)} Novo</button><button class="quiet iconbtn" data-erp="avisos" aria-label="Avisos">${ico('bell',19)}${av.length?`<i class="belldot">${av.length}</i>`:''}</button><span class="demo">BASE OPERACIONAL</span><span class="avatar">GK</span></div></header>
+  <div class="row hdrright" style="margin-left:auto"><button class="primary newbtn" data-erp="novo">${ico('plus',16)} Novo</button><button class="quiet iconbtn" data-erp="avisos" aria-label="Avisos">${ico('bell',19)}${av.length?`<i class="belldot">${av.length}</i>`:''}</button><button class="quiet iconbtn" data-action="theme" aria-label="Alternar tema claro e escuro" title="Tema claro / escuro">${ico(db.theme==='light'?'moon':'sun',18)}</button><span class="demo">BASE OPERACIONAL</span><span class="avatar">GK</span></div></header>
  <div class="content"><div class="pagehead"><div><div class="crumb">${esc(M.t)} <span>›</span> ${esc(cur)}</div><h1>${page==='central'?`Bom dia${window.Cloud?.session?.user?.email?'':''}`:esc(cur)}</h1><p>${subtitle()}</p></div>
   <div class="row wrap pageactions"><label class="monthsel">${ico('calendar',16)}<select id="month" aria-label="Competência">${meses.map(m=>`<option value="${m}" ${month===m?'selected':''}>${mesBR(m)}</option>`).join('')}</select></label></div></div>
  <div id="view"></div><div class="footer"><span>EcomBalance</span><span><span class="dot"></span>Seu controle começa com clareza.</span></div></div></main></div>
@@ -92,7 +92,7 @@ document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLower
 document.addEventListener('click',e=>{const b=e.target.closest('[data-cad-abrir]');if(!b)return;const [pg,id]=b.dataset.cadAbrir.split(':');closeModal();const u=cadUI(pg);u.modo='ficha';u.id=id;navigate(pg)},true);
 document.addEventListener('click',e=>{if(e.target.closest('#bgRes [data-nav],#bgRes [data-order],#bgRes [data-pg-nota]'))setTimeout(()=>{if(!e.target.closest('[data-order],[data-pg-nota]'))closeModal()},0)});
 // Troca de módulo pela barra: abre a primeira tela do módulo.
-document.addEventListener('click',e=>{const b=e.target.closest('.rail [data-mod]');if(!b)return;e.stopImmediatePropagation();const m=MODS.find(x=>x.id===b.dataset.mod);modAtual=m.id;navigate(m.grupos[0][1][0])},true);
+document.addEventListener('click',e=>{const b=e.target.closest('[data-mtoggle]');if(!b)return;e.stopImmediatePropagation();const id=b.dataset.mtoggle,g=b.closest('.mgroup');if(g.classList.contains('open')){menuAberto.delete(id);menuFechado.add(id)}else{menuAberto.add(id);menuFechado.delete(id)}salvarMenu();render()},true);
 
 // ═════════════════ Central do dia ═════════════════
 function projecao(dias=30){const h=hoje(),s=window.Tesouraria?.saldos()||{total:0,contas:[]};let saldo=s.total;const serie=[];
@@ -102,9 +102,19 @@ function projecao(dias=30){const h=hoje(),s=window.Tesouraria?.saldos()||{total:
  for(let i=0;i<dias;i++){const d=addDias(h,i),en=entradas.get(d)||0,sa=saidas.get(d)||0;saldo=round(saldo+en-sa);serie.push({d,en,sa,saldo})}return {serie,inicial:s.total,contas:s.contas}}
 function graficoCaixa(serie){const W=900,H=260,max=Math.max(1,...serie.map(x=>Math.max(x.en,x.sa))),smin=Math.min(0,...serie.map(x=>x.saldo)),smax=Math.max(1,...serie.map(x=>x.saldo)),bw=W/serie.length;
  const yb=v=>H-30-(v/max)*(H-60),ys=v=>20+(1-(v-smin)/((smax-smin)||1))*(H-60);
- return `<svg viewBox="0 0 ${W} ${H}" class="cashchart" role="img" aria-label="Caixa projetado">${[0,1,2,3].map(i=>`<line x1="0" x2="${W}" y1="${20+i*(H-50)/3}" y2="${20+i*(H-50)/3}" class="grid"/>`).join('')}
+ grafico={serie,W,bw,ys};
+ return `<div class="cashwrap"><svg viewBox="0 0 ${W} ${H}" class="cashchart" id="cashSvg" role="img" aria-label="Caixa projetado">${[0,1,2,3].map(i=>`<line x1="0" x2="${W}" y1="${20+i*(H-50)/3}" y2="${20+i*(H-50)/3}" class="grid"/>`).join('')}
  ${serie.map((x,i)=>`${x.en?`<rect x="${i*bw+bw*.12}" y="${yb(x.en)}" width="${bw*.34}" height="${H-30-yb(x.en)}" rx="2" class="en"><title>${dataBR(x.d)} · entradas ${money(x.en)}</title></rect>`:''}${x.sa?`<rect x="${i*bw+bw*.5}" y="${yb(x.sa)}" width="${bw*.34}" height="${H-30-yb(x.sa)}" rx="2" class="sa"><title>${dataBR(x.d)} · saídas ${money(x.sa)}</title></rect>`:''}`).join('')}
- <polyline class="saldo" points="${serie.map((x,i)=>`${i*bw+bw/2},${ys(x.saldo)}`).join(' ')}"/>${serie.filter((_,i)=>i%7===0).map((x,i)=>`<text x="${i*7*bw+2}" y="${H-8}">${dataBR(x.d).slice(0,5)}</text>`).join('')}</svg>`}
+ <polyline class="saldo" points="${serie.map((x,i)=>`${i*bw+bw/2},${ys(x.saldo)}`).join(' ')}"/>${serie.filter((_,i)=>i%7===0).map((x,i)=>`<text x="${i*7*bw+2}" y="${H-8}">${dataBR(x.d).slice(0,5)}</text>`).join('')}<line id="ccLine" class="hovline" x1="0" x2="0" y1="12" y2="${H-28}" visibility="hidden"/><circle id="ccDot" class="hovdot" r="6" cx="0" cy="0" visibility="hidden"/><rect x="0" y="0" width="${W}" height="${H}" fill="transparent" id="ccHit"/></svg><div class="cctip" id="ccTip" hidden></div></div>`}
+// Ponto que acompanha o mouse (ou o dedo) e mostra os números do dia.
+let grafico=null;
+function bindGrafico(){const svg=$('#cashSvg');if(!svg||!grafico)return;const {serie,W,bw,ys}=grafico,tip=$('#ccTip'),line=$('#ccLine'),dot=$('#ccDot');
+ const mover=cx=>{const r=svg.getBoundingClientRect(),k=W/r.width,i=Math.max(0,Math.min(serie.length-1,Math.floor((cx-r.left)*k/bw))),x=serie[i],px=i*bw+bw/2;
+  line.setAttribute('x1',px);line.setAttribute('x2',px);dot.setAttribute('cx',px);dot.setAttribute('cy',ys(x.saldo));line.setAttribute('visibility','visible');dot.setAttribute('visibility','visible');
+  tip.hidden=false;tip.innerHTML=`<strong>${new Date(x.d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</strong><span><i style="background:var(--green)"></i>Entradas <b>${money(x.en)}</b></span><span><i style="background:var(--red)"></i>Saídas <b>${money(x.sa)}</b></span><span><i style="background:var(--accent)"></i>Saldo <b class="${x.saldo<0?'red':''}">${money(x.saldo)}</b></span>`;
+  const left=px/k,top=ys(x.saldo)/k,w=tip.offsetWidth;tip.style.left=Math.max(0,Math.min(r.width-w,left-w/2))+'px';tip.style.top=Math.max(0,top-tip.offsetHeight-14)+'px'};
+ const sair=()=>{tip.hidden=true;line.setAttribute('visibility','hidden');dot.setAttribute('visibility','hidden')};
+ svg.onmousemove=e=>mover(e.clientX);svg.onmouseleave=sair;svg.ontouchmove=e=>{mover(e.touches[0].clientX)};svg.ontouchend=sair}
 function centralView(){const h=hoje(),c=contagens(),pr=projecao(30),ser=pr.serie,menor=ser.reduce((m,x)=>x.saldo<m.saldo?x:m,ser[0]||{saldo:0,d:h});
  const receber=round(db.orders.filter(o=>['A receber','Em trânsito'].includes(status(o))).reduce((a,o)=>a+Math.max(0,net(o)-paid(o)),0));
  const vendasHoje=db.orders.filter(o=>o.date===h),vh=round(vendasHoje.reduce((a,o)=>a+o.gross,0)),soma=l=>round(l.reduce((a,t)=>a+saldoT(t),0));
@@ -268,7 +278,7 @@ function relView(){const r=RELS.find(x=>x[0]===rel.id),d=relDados(),contas=db.ba
 addPage('relfin','print','Relatórios financeiros',relView,'Relatórios com filtros, totais, exportação para Excel e impressão.','',()=>{$$('[data-relp]').forEach(el=>el.onchange=()=>{rel[el.dataset.relp]=el.value;render()})});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-rel],[data-rel-csv]');if(!b)return;if(b.dataset.rel){rel.id=b.dataset.rel;rel.conta='';render();return}const d=relDados();download(`EcomBalance_relatorio_${rel.id}.csv`,csv(d.csv))});
 
-addPage('central','home','Central do dia',centralView,'O que entra, o que sai e o que precisa da sua atenção hoje.','',()=>{});
+addPage('central','home','Central do dia',centralView,'O que entra, o que sai e o que precisa da sua atenção hoje.','',bindGrafico);
 // Abre na Central do dia quando não há tela no endereço.
 if(!location.hash&&page==='dashboard')page='central';
 window.ERP={busca,projecao,cadUI};

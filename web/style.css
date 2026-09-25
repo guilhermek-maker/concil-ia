@@ -200,3 +200,26 @@ body.light .erp .rail{background:#1b2035}
 @media(max-width:760px){.erp{grid-template-columns:1fr}.erp .rail{position:fixed;left:0;top:0;z-index:30;transform:translateX(-100%);transition:.2s}.erp aside.subnav{position:fixed;left:78px;top:0;width:260px;z-index:30;transform:translateX(-120%);transition:.2s}
  body.menu .erp .rail,body.menu .erp aside.subnav{transform:none}.erp .mobilemenu{display:inline-flex}.erp header{padding:0 16px}.wschip .wsname,.hdrright .demo,.equipebtn span:not(.navbadge){display:none}.erp .content{padding:22px 16px}.kpis4{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}.formgrid .field{grid-column:auto!important}.pagehead{flex-direction:column;align-items:flex-start}.conchead,.concrow{grid-template-columns:1fr}.concm{display:none}.searchin input{min-width:0}}
 @media print{.erp{display:block}.erp .rail,.erp aside.subnav,.erp header,.toolbar,.pageactions,.relparams,.rellist,.relhead .row,#assistant,.footer{display:none!important}.relgrid{display:block}.printhead{display:block;margin-bottom:12px;font-size:12px}.erp .content{padding:0}.pagehead{margin-bottom:8px}.pagehead p{display:none}}
+
+/* Menu lateral único (grupos que abrem e fecham) */
+.erp{grid-template-columns:272px minmax(0,1fr)}
+.erp .side{position:sticky;top:0;height:100vh;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 14px 14px;overflow-y:auto;z-index:5}
+.sidebrand{display:flex;align-items:center;gap:12px;border:0;background:transparent;padding:4px 8px 18px;margin-bottom:8px;border-bottom:1px solid var(--line);border-radius:0;justify-content:flex-start;width:100%}
+.sidebrand:hover{transform:none}.sidebrand img{height:52px;width:auto;flex:none}.sidebrand span{display:flex;flex-direction:column;text-align:left;line-height:1.25}.sidebrand strong{font-size:16px;letter-spacing:-.2px}.sidebrand small{font-size:11.5px;color:var(--muted)}
+.erp .menu{display:flex;flex-direction:column;gap:2px}.erp .menu button{width:100%;justify-content:flex-start;border:0;background:transparent;color:var(--muted);gap:11px;border-radius:10px;font-size:14px;padding:10px 12px}
+.erp .menu button:hover{background:var(--panel2);color:var(--text);transform:none}.erp .menu button span{flex:1;text-align:left}
+.mhead{font-weight:600}.mhead>.icon:last-child{transition:transform .15s;opacity:.6}.mgroup.open>.mhead>.icon:last-child{transform:rotate(90deg)}.mgroup.cur>.mhead{color:var(--text)!important}
+.erp .menu .mhead.active{background:#a88aff1f;color:var(--text);box-shadow:inset 3px 0 var(--accent)}
+.mitems{display:flex;flex-direction:column;gap:1px;margin:2px 0 8px 20px;padding-left:10px;border-left:1px solid var(--line)}
+.erp .mitems button{padding:8px 12px;font-size:13.5px}.erp .mitems button.active{background:#a88aff1f;color:var(--text);font-weight:600;box-shadow:inset 3px 0 var(--accent)}
+.mlabel{font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);opacity:.75;font-weight:700;padding:10px 12px 4px}
+.menufoot{margin-top:auto;padding-top:12px;border-top:1px solid var(--line)}
+/* Gráfico com ponto que acompanha o mouse */
+.cashwrap{position:relative}.hovline{stroke:var(--muted);stroke-dasharray:4 4;stroke-width:1}.hovdot{fill:var(--accent);stroke:var(--panel);stroke-width:3}
+.cctip{position:absolute;pointer-events:none;background:var(--panel2);border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);padding:10px 12px;display:flex;flex-direction:column;gap:4px;font-size:12.5px;min-width:190px;z-index:3}
+.cctip strong{font-size:13px;text-transform:capitalize;margin-bottom:2px}.cctip span{display:flex;align-items:center;gap:7px;color:var(--muted)}.cctip b{margin-left:auto;color:var(--text);font-variant-numeric:tabular-nums}.cctip i{width:8px;height:8px;border-radius:2px}
+@media(max-width:1180px){.erp{grid-template-columns:240px minmax(0,1fr)}}
+@media(max-width:760px){.erp{grid-template-columns:1fr}.erp .side{position:fixed;left:0;top:0;width:280px;z-index:30;transform:translateX(-105%);transition:.2s}body.menu .erp .side{transform:none}}
+
+.sidebrand span{min-width:0}.sidebrand strong,.sidebrand small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.erp .menu button span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:1180px){.sidebrand img{height:40px}}
