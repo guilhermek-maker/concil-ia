@@ -74,6 +74,42 @@ async function startJob(db: Db, ws: string, id: string, from: string, to: string
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
 
+/** Compras da própria conta como comprador: pedidos no Mercado Livre e pagamentos feitos pelo Mercado Pago. */
+async function comprasMercadoLivre(db: Db, ws: string, desde: string) {
+  const sec = await validSecret(db, ws, "mercadolivre");
+  const uid = sec.extra?.user_id, auth = { Authorization: `Bearer ${sec.access_token}` };
+  const get = async (u: string) => { const r = await fetch(u, { headers: auth }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(`${r.status} ${j?.message ?? ""} ${u.split("?")[0]}`); return j; };
+  const rows: Record<string, unknown>[] = [];
+  const from = `${desde}T00:00:00.000-03:00`;
+  for (let off = 0; off < 2000; off += 50) {
+    const j = await get(`https://api.mercadolibre.com/orders/search?buyer=${uid}&order.date_created.from=${encodeURIComponent(from)}&sort=date_desc&limit=50&offset=${off}`);
+    for (const o of j.results ?? []) rows.push({
+      workspace_id: ws, id: `ML-${o.id}`, origem: "ml_pedido", data: o.date_created, valor: o.paid_amount ?? o.total_amount, status: o.status,
+      vendedor: o.seller?.nickname ?? String(o.seller?.id ?? ""), descricao: (o.order_items ?? []).map((x: any) => x.item?.title).filter(Boolean).join(" · "),
+      itens: (o.order_items ?? []).map((x: any) => ({ titulo: x.item?.title, qtd: x.quantity, unitario: x.unit_price })),
+      pagamentos: (o.payments ?? []).map((p: any) => ({ id: p.id, tipo: p.payment_type, metodo: p.payment_method_id, valor: p.total_paid_amount, aprovado: p.date_approved, status: p.status })),
+      raw: { pack_id: o.pack_id, shipping: o.shipping?.id }, updated_at: new Date().toISOString(),
+    });
+    if ((j.results ?? []).length < 50) break;
+  }
+  let mp = 0;
+  try {
+    for (let off = 0; off < 2000; off += 100) {
+      const j = await get(`https://api.mercadopago.com/v1/payments/search?payer.id=${uid}&range=date_created&begin_date=${encodeURIComponent(from)}&end_date=NOW&sort=date_created&criteria=desc&limit=100&offset=${off}`);
+      for (const p of j.results ?? []) { mp++; rows.push({
+        workspace_id: ws, id: `MP-${p.id}`, origem: "mp_pagamento", data: p.date_approved ?? p.date_created, valor: p.transaction_amount, status: p.status,
+        vendedor: p.collector?.nickname ?? p.statement_descriptor ?? String(p.collector_id ?? ""), descricao: p.description ?? (p.additional_info?.items ?? []).map((x: any) => x.title).join(" · "),
+        itens: p.additional_info?.items ?? null, pagamentos: [{ id: p.id, tipo: p.payment_type_id, metodo: p.payment_method_id, valor: p.transaction_details?.total_paid_amount ?? p.transaction_amount, aprovado: p.date_approved, status: p.status }],
+        raw: { order: p.order, operation_type: p.operation_type, external_reference: p.external_reference }, updated_at: new Date().toISOString(),
+      }); }
+      if ((j.results ?? []).length < 100) break;
+    }
+  } catch (e) { rows.push(); console.warn("mp payments", String(e)); }
+  const uniq = [...new Map(rows.map((r) => [r.id as string, r])).values()];
+  for (let k = 0; k < uniq.length; k += 200) { const { error } = await db.from("compras_marketplace").upsert(uniq.slice(k, k + 200), { onConflict: "workspace_id,id" }); if (error) throw error; }
+  return { pedidos: uniq.filter((r) => r.origem === "ml_pedido").length, pagamentos_mp: mp };
+}
+
 Deno.serve(handler(async (req) => {
   const body = await req.json().catch(() => ({}));
   const action = String(body.action ?? "");
@@ -87,6 +123,14 @@ Deno.serve(handler(async (req) => {
     // Quem foi atendido há mais tempo vai primeiro, e o tempo da rodada é dividido entre as integrações.
     const list = (data ?? []).sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)));
     const report = [];
+    // Tarefa "compras": compras feitas pela própria conta no Mercado Livre / Mercado Pago (como comprador).
+    for (const i of list.filter((x) => x.provider === "mercadolivre" && x.settings?.tarefas?.compras)) {
+      try {
+        const r = await comprasMercadoLivre(db, i.workspace_id, String(i.settings.tarefas.compras));
+        await writeSettings(db, i.workspace_id, i.provider, (s) => { delete s.tarefas?.compras; s.ultimaTarefa = { compras: r, fim: new Date().toISOString() }; });
+        report.push({ workspace_id: i.workspace_id, compras: r });
+      } catch (e) { report.push({ workspace_id: i.workspace_id, compras_erro: String(e) }); }
+    }
     for (const [n, i] of list.entries()) {
       if (Date.now() > deadline - 15_000) break;
       const slot = Math.min(deadline, Date.now() + (deadline - Date.now()) / (list.length - n));
