@@ -105,3 +105,8 @@ table.sens td,table.sens th{padding:8px 10px;text-align:center}
 .complogo.login{margin:0 0 22px;width:max-content}
 .complogo.login img{height:64px}
 @media(max-width:1150px){.complogo img{height:44px}}
+table.dre tr.conta td{font-size:11px;color:var(--muted);padding:6px 14px}
+table.dre tr.conta td:first-child{padding-left:30px}
+.cascata{width:100%;height:auto;display:block}
+.cascata text{fill:var(--muted);font-size:10px}
+.cascata text.neg{fill:var(--red)}
