@@ -19,7 +19,7 @@ const saldo=t=>round(Math.max(0,t.valor+(t.juros||0)-(t.desconto||0)-(t.valorPag
 const situacao=t=>t.status==='cancelado'?'Cancelado':t.status==='pago'?'Pago':t.vencimento<hoje()?'Vencido':t.status==='parcial'?'Parcial':'Em aberto';
 const TOM={'Pago':'ok','Cancelado':'','Vencido':'bad','Parcial':'info','Em aberto':'warn'};
 const CATEGORIAS=['Compra de mercadorias','Embalagens','Fretes e logística','Marketing e anúncios','Tarifas de marketplace','Aluguel','Água, luz e internet','Pró-labore','Salários e encargos','Impostos e taxas','Serviços de terceiros','Contabilidade','Sistemas e softwares','Tarifas bancárias','Empréstimos e juros','Outras despesas'];
-const categorias=()=>[...new Set([...CATEGORIAS,...P().map(t=>t.categoria).filter(Boolean)])];
+const categorias=()=>{const cad=(db.cadastros||[]).filter(c=>c.tipo==='cat'&&c.ativo!==false).map(c=>c.dados.nome);return [...new Set([...(cad.length?cad:CATEGORIAS),...P().map(t=>t.categoria).filter(Boolean)])]};
 const contas=()=>[...new Set(['Banco principal','Caixa',...P().map(t=>t.conta).filter(Boolean)])];
 const ui={filtro:'abertos',busca:'',periodo:'mes',sel:new Set(),ctipo:'compra'};
 
@@ -124,7 +124,7 @@ document.addEventListener('click',e=>{const tr=e.target.closest('tr[data-pg-nota
  if(d.pgSalvar){const t=P().find(x=>x.id===d.pgSalvar),f=lerForm();if(!(f.valor>0))return toast('Informe o valor.');Object.assign(t,f);t.status=t.status==='cancelado'?'cancelado':saldo(t)<0.01&&t.valorPago?'pago':t.valorPago?'parcial':'aberto';audit('Título a pagar editado',`${t.fornecedor||t.descricao} · ${money(t.valor)} · venc. ${dataBR(t.vencimento)}`);closeModal();render();toast('Título atualizado.');return}
  if(d.pgCancelar){const t=P().find(x=>x.id===d.pgCancelar);if(!confirm('Cancelar este título? Ele deixa de aparecer como a pagar.'))return;t.status='cancelado';audit('Título a pagar cancelado',`${t.fornecedor||t.descricao} · ${money(t.valor)}`);closeModal();render();return}
  if(d.pgEstornar){const t=P().find(x=>x.id===d.pgEstornar);if(!confirm('Estornar o pagamento registrado deste título?'))return;audit('Pagamento estornado',`${t.fornecedor||t.descricao} · ${money(t.valorPago)}`);t.valorPago=0;t.pagoEm=null;t.juros=0;t.desconto=0;t.status='aberto';closeModal();render();return}
- switch(d.pg){case'novo':novo();break;case'salvar-novo':salvarNovo();break;case'limpar-dia':ui.dia=null;render();break;
+ switch(d.pg){case'novo':navigate('lancamento');break;case'salvar-novo':salvarNovo();break;case'limpar-dia':ui.dia=null;render();break;
   case'baixar-lote':pagar([...ui.sel]);break;
   case'exportar':download(`EcomBalance_contas_a_pagar_${month}.csv`,csv([['vencimento','fornecedor','documento','descricao','parcela','categoria','centro_custo','valor','juros','desconto','pago','pago_em','conta','situacao','origem'],...lista().map(t=>[t.vencimento,t.fornecedor||'',t.fornecedorDoc||'',t.descricao||'',t.parcelas>1?`${t.parcela}/${t.parcelas}`:'',t.categoria||'',t.centroCusto||'',t.valor,t.juros||0,t.desconto||0,t.valorPago||0,t.pagoEm||'',t.conta||'',situacao(t),t.origem])]));break}
 });

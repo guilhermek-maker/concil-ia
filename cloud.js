@@ -41,11 +41,20 @@ const maps={
  payables:{table:'payables',key:'id',
   toRow:t=>({id:t.id,origem:t.origem||'manual',invoice_id:t.invoiceId||null,fornecedor:t.fornecedor||null,fornecedor_doc:t.fornecedorDoc||null,descricao:t.descricao||null,documento:t.documento||null,parcela:t.parcela??null,parcelas:t.parcelas??null,emissao:t.emissao||null,vencimento:t.vencimento,valor:t.valor,juros:t.juros||0,desconto:t.desconto||0,valor_pago:t.valorPago||0,pago_em:t.pagoEm||null,status:t.status||'aberto',categoria:t.categoria||null,centro_custo:t.centroCusto||null,conta:t.conta||null,observacao:t.observacao||null,anexos:t.anexos||null,created_by:t.createdBy||null}),
   fromRow:r=>({id:r.id,origem:r.origem,invoiceId:r.invoice_id||null,fornecedor:r.fornecedor||'',fornecedorDoc:r.fornecedor_doc||'',descricao:r.descricao||'',documento:r.documento||'',parcela:r.parcela,parcelas:r.parcelas,emissao:r.emissao||'',vencimento:r.vencimento,valor:n(r.valor),juros:n(r.juros),desconto:n(r.desconto),valorPago:n(r.valor_pago),pagoEm:r.pago_em||null,status:r.status,categoria:r.categoria||'',centroCusto:r.centro_custo||'',conta:r.conta||'',observacao:r.observacao||'',anexos:r.anexos||null,createdBy:r.created_by||''})},
+ bankAccounts:{table:'bank_accounts',key:'id',
+  toRow:a=>({id:a.id,nome:a.nome,banco:a.banco||null,agencia:a.agencia||null,conta:a.conta||null,tipo:a.tipo||'corrente',saldo_inicial:a.saldoInicial||0,data_saldo_inicial:a.dataSaldoInicial||null,saldo_extrato:a.saldoExtrato??null,data_saldo_extrato:a.dataSaldoExtrato||null,ativo:a.ativo!==false}),
+  fromRow:r=>({id:r.id,nome:r.nome,banco:r.banco||'',agencia:r.agencia||'',conta:r.conta||'',tipo:r.tipo,saldoInicial:n(r.saldo_inicial),dataSaldoInicial:r.data_saldo_inicial||null,saldoExtrato:r.saldo_extrato==null?null:n(r.saldo_extrato),dataSaldoExtrato:r.data_saldo_extrato||null,ativo:r.ativo})},
+ bankTx:{table:'bank_transactions',key:'id',
+  toRow:t=>({id:t.id,conta_id:t.contaId,data:t.data,descricao:t.descricao||null,documento:t.documento||null,valor:t.valor,fitid:t.fitid||null,origem:t.origem||'ofx',status:t.status||'pendente',vinculo:t.vinculo||null,categoria:t.categoria||null,observacao:t.observacao||null,arquivo:t.arquivo||null}),
+  fromRow:r=>({id:r.id,contaId:r.conta_id,data:r.data,descricao:r.descricao||'',documento:r.documento||'',valor:n(r.valor),fitid:r.fitid,origem:r.origem,status:r.status,vinculo:r.vinculo||null,categoria:r.categoria||'',observacao:r.observacao||'',arquivo:r.arquivo||''})},
+ cadastros:{table:'cadastros',key:'id',
+  toRow:c=>({id:c.id,tipo:c.tipo,dados:c.dados||{},ativo:c.ativo!==false}),
+  fromRow:r=>({id:r.id,tipo:r.tipo,dados:r.dados||{},ativo:r.ativo})},
  audit:{table:'audit_log',key:'id',insertOnly:true,
   toRow:a=>({id:a.id,time:a.time,action:a.action,detail:a.detail||'',actor:a.actor||Cloud.session?.user?.email||null}),
   fromRow:r=>({id:r.id,time:r.time,action:r.action,detail:r.detail,actor:r.actor})},
 };
-const listOf={orders:()=>db.orders,receipts:()=>db.receipts,ledger:()=>db.ledger,imports:()=>db.imports,audit:()=>db.audit,accLines:()=>db.accLines||[],accDocs:()=>db.accDocs||[],products:()=>db.products||[],scenarios:()=>db.scenarios||[],payables:()=>db.payables||[]};
+const listOf={orders:()=>db.orders,receipts:()=>db.receipts,ledger:()=>db.ledger,imports:()=>db.imports,audit:()=>db.audit,accLines:()=>db.accLines||[],accDocs:()=>db.accDocs||[],products:()=>db.products||[],scenarios:()=>db.scenarios||[],payables:()=>db.payables||[],bankAccounts:()=>db.bankAccounts||[],bankTx:()=>db.bankTx||[],cadastros:()=>db.cadastros||[]};
 let snap={};           // último estado gravado: coleção → Map(id → JSON)
 let flushTimer=null,flushing=null,dirty=false;
 
@@ -64,7 +73,7 @@ async function load(){
   crm:Object.fromEntries(crm.map(c=>[c.id,{stage:c.stage,tags:c.tags||[],notes:c.notes||'',interactions:c.interactions||[]}])),
   closures:Object.fromEntries(closures.map(c=>[c.month,c.data])),theme:settings[0]?.data?.theme||db.theme||'dark',schemaVersion:2,
   accLines:accLines.map(maps.accLines.fromRow),accMap:Object.fromEntries(accMap.map(a=>[a.conta,{linha:a.linha,descricao:a.descricao||''}])),accDocs:accDocs.map(maps.accDocs.fromRow),
-  products:products.map(maps.products.fromRow),scenarios:scenarios.map(maps.scenarios.fromRow),payables:(await pageAll('payables')).map(maps.payables.fromRow),
+  products:products.map(maps.products.fromRow),scenarios:scenarios.map(maps.scenarios.fromRow),payables:(await pageAll('payables')).map(maps.payables.fromRow),bankAccounts:(await pageAll('bank_accounts')).map(maps.bankAccounts.fromRow),bankTx:(await pageAll('bank_transactions')).map(maps.bankTx.fromRow),cadastros:(await pageAll('cadastros')).map(maps.cadastros.fromRow),
   // Notas de entrada: só leitura (a origem é o Bling), sem o JSON bruto.
   purchases:(await pageAll('purchase_invoices','id,numero,serie,chave,emissao,fornecedor,fornecedor_doc,valor,cfop,natureza,tipo,situacao,itens,parcelas')).map(r=>({id:r.id,numero:r.numero,serie:r.serie,chave:r.chave,emissao:r.emissao,fornecedor:r.fornecedor,fornecedorDoc:r.fornecedor_doc,valor:n(r.valor),cfop:r.cfop,natureza:r.natureza,tipo:r.tipo,situacao:r.situacao,itens:r.itens||[],parcelas:r.parcelas||[]})),pricing:settings[0]?.data?.pricing||undefined,gerencial:settings[0]?.data?.gerencial||undefined};
  db=next;paymentIndex=null;snapshot();Cloud.state='saved';
