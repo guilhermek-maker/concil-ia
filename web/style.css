@@ -98,3 +98,10 @@ table.sens td,table.sens th{padding:8px 10px;text-align:center}
 .heat.ok{background:#66dfb522;color:var(--green)}.heat.warn{background:#edc47b22;color:var(--gold)}.heat.bad{background:#ff8d9f22;color:var(--red)}
 @media(max-width:1150px){.simgrid{grid-template-columns:1fr}.simgrid>.card{position:static}}
 @media(max-width:620px){.rulegrid{grid-template-columns:1fr}.inp input{width:100%}}
+
+/* Marca da empresa */
+.complogo{background:#fff;border-radius:12px;padding:8px 10px;margin:0 6px 22px;display:flex;justify-content:center}
+.complogo img{height:56px;width:auto;display:block}
+.complogo.login{margin:0 0 22px;width:max-content}
+.complogo.login img{height:64px}
+@media(max-width:1150px){.complogo img{height:44px}}
