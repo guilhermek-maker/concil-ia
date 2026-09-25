@@ -107,6 +107,11 @@ Deno.serve(handler(async (req) => {
         report.push({ workspace_id: i.workspace_id, provider: i.provider, ...(await advanceJob(db, i.workspace_id, i.provider, slot)) });
       } catch (e) { report.push({ workspace_id: i.workspace_id, provider: i.provider, error: String(e) }); }
     }
+    // Conciliação automática das correspondências exatas (só nos workspaces que ligaram a opção).
+    for (const w of new Set(list.map((i) => i.workspace_id))) {
+      const { data: n, error } = await db.rpc("auto_link_exatos", { ws: w });
+      report.push({ workspace_id: w, auto_vinculos: error ? String(error.message) : n });
+    }
     return json({ report });
   }
 
@@ -142,6 +147,7 @@ Deno.serve(handler(async (req) => {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to) throw new HttpError(400, "Período inválido.");
       await startJob(db, ws, id, from, to);
       const r = await advanceJob(db, ws, id, Date.now() + BUDGET_MS);
+      if (r.done) await admin().rpc("auto_link_exatos", { ws });
       return json({ ...r, next: !r.done });
     }
     case "job": {

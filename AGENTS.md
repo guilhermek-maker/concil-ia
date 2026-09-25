@@ -4,7 +4,7 @@
 Ferramenta de conciliação financeira de e-commerce: Bling (ERP, origem fiscal) × Mercado Livre/Mercado Pago, Shopee e Magalu. Público: financeiro de uma operação brasileira. Toda a interface é em português do Brasil.
 
 ## Regras de negócio que não podem quebrar
-1. **Confirmação humana para tudo que é financeiro.** Vínculos, desvínculos, fechamento e reabertura só acontecem por clique do usuário. A IA e as integrações apenas trazem dados e *propõem*.
+1. **Confirmação humana para tudo que é financeiro**, com uma exceção autorizada pelo dono em 25/09/2026: a *conciliação automática* (`workspaces.auto_link`, função `auto_link_exatos`) vincula sozinha apenas liberação positiva que bate ao centavo com o repasse previsto do mesmo pedido, em competência aberta, e registra na auditoria. Qualquer outro vínculo, desvínculo, fechamento ou reabertura continua exigindo clique do usuário. A IA e as integrações apenas trazem dados e *propõem*.
 2. **Líquido esperado = bruto − taxa.** Status: Conciliado (vinculado = líquido ± R$ 0,01), Divergência, A receber, Em trânsito.
 3. **Competência = mês da emissão da NF.** Competência fechada bloqueia alterações em pedidos e liberações dela.
 4. **Sincronização nunca sobrescreve trabalho humano**: `note`, `transit`, `linked_order` e fechamentos (ver `supabase/functions/_shared/store.ts`).
