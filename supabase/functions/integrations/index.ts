@@ -89,8 +89,17 @@ Deno.serve(handler(async (req) => {
       if (Date.now() > deadline - 15_000) break;
       try {
         if (!i.settings?.job) {
-          if (i.last_sync && Date.now() - new Date(i.last_sync).getTime() < HOURLY_MS) continue;
-          await startJob(db, i.workspace_id, i.provider, iso(new Date(Date.now() - 7 * 86400_000)), iso(new Date()));
+          // Fila de períodos (ex.: histórico desde abril): um por vez, antes da sincronização de hora em hora.
+          const fila = (i.settings?.fila ?? []) as { from: string; to: string }[];
+          if (fila.length) {
+            await writeSettings(db, i.workspace_id, i.provider, (s) => {
+              s.fila = (s.fila ?? []).slice(1);
+              s.job = { from: fila[0].from, to: fila[0].to, cursor: null, locked_until: null, started_at: new Date().toISOString(), saved: {} };
+            });
+          } else {
+            if (i.last_sync && Date.now() - new Date(i.last_sync).getTime() < HOURLY_MS) continue;
+            await startJob(db, i.workspace_id, i.provider, iso(new Date(Date.now() - 7 * 86400_000)), iso(new Date()));
+          }
         }
         report.push({ ...i, settings: undefined, ...(await advanceJob(db, i.workspace_id, i.provider, deadline)) });
       } catch (e) { report.push({ workspace_id: i.workspace_id, provider: i.provider, error: String(e) }); }
