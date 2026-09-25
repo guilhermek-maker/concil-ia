@@ -21,8 +21,9 @@ const MODS=[
  {id:'ini',ic:'home',t:'Início',grupos:[['Hoje',['central']]]},
  {id:'ven',ic:'link',t:'Vendas',grupos:[['Painel',['dashboard']],['Conciliação',['reconcile','pending','closing']],['Integração',['integracoes','imports']]],plataformas:true},
  {id:'fin',ic:'wallet',t:'Financeiro',grupos:[['Contas a pagar',['lancamento','pagar','compras']],['Tesouraria',['tesouraria','concbanco']],['Caixa',['fluxo']]]},
- {id:'cad',ic:'folder',t:'Cadastros',grupos:[['Parceiros',['fornecedores','clientes']],['Financeiro',['cadcontas','categorias','centros']],['Produtos',['cadprodutos']]]},
- {id:'res',ic:'chart',t:'Resultado',grupos:[['Contábil',['contabil']],['Análise de vendas',['produtos','estados']]]},
+ {id:'crm',ic:'heart',t:'CRM',grupos:[['CRM',['crm','clientes','crmprodutos','crmgeo','crmacoes']]]},
+ {id:'cad',ic:'folder',t:'Cadastros',grupos:[['Parceiros',['fornecedores']],['Financeiro',['cadcontas','categorias','centros']],['Produtos',['cadprodutos']]]},
+ {id:'res',ic:'chart',t:'Resultado',grupos:[['Contábil',['contabil']]]},
  {id:'pre',ic:'tag',t:'Preços',grupos:[['Formação de preço',['precos']]]},
  {id:'rel',ic:'print',t:'Relatórios',grupos:[['Relatórios',['relfin','reports']]]}];
 const GERAL=['equipe','ai','history'];
