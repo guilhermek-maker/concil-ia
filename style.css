@@ -254,3 +254,16 @@ body.light .erp .rail{background:#1b2035}
 /* Listas suspensas nativas seguem o tema */
 select{color-scheme:dark}select option,select optgroup{background:var(--panel);color:var(--text)}select option:checked{background:#a88aff33}
 body.light select{color-scheme:light}
+
+/* CRM */
+.crm2{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}
+.brmap{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(8,auto);gap:6px;max-width:520px;margin:4px auto 6px}
+.brmap .uf{aspect-ratio:1.15;border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:2px;font-size:12px;line-height:1.1}
+.brmap .uf b{font-size:13px}.brmap .uf small{font-size:10px;opacity:.85}.brmap .uf:hover{transform:scale(1.06);border-color:var(--accent)}.brmap .uf.sel{outline:2px solid var(--gold);outline-offset:1px}
+.hrow{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;align-items:center;gap:12px;padding:7px 0;font-size:13.5px}
+.hlab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.htrack{height:8px;background:var(--panel2);border-radius:6px;overflow:hidden}.htrack i{display:block;height:100%;border-radius:6px}.hrow strong{font-variant-numeric:tabular-nums;font-size:13px}
+.colchart2{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:8px;height:190px;align-items:end}
+.col2{display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}.col2 .stack{flex:1;width:70%;max-width:34px;display:flex;flex-direction:column-reverse;border-radius:6px;overflow:hidden;background:var(--panel2)}
+.col2 .nov{background:var(--accent)}.col2 .rec{background:var(--green)}.col2 small{font-size:11px;color:var(--muted);text-transform:capitalize}
+tr.sel td{background:#a88aff12}
+@media(max-width:1180px){.crm2{grid-template-columns:1fr}}
