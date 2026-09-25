@@ -113,7 +113,7 @@ table.dre tr.conta td:first-child{padding-left:30px}
 
 .modswitch{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:14px 0 4px;padding:4px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}.modswitch button{flex-direction:column;gap:3px;padding:8px 2px;border:0;background:transparent;color:var(--muted);font-size:10.5px;border-radius:8px}.modswitch button .icon{width:16px;height:16px}.modswitch button:hover{transform:none;color:var(--text)}.modswitch button.active{background:#a88aff22;color:var(--accent);font-weight:650}.modtitle{margin:16px 13px 0;font-size:15px;font-weight:650}.modtitle small{display:block;font-size:10.5px;font-weight:400;color:var(--muted)}aside .navlabel{margin:16px 13px 5px}aside nav button{padding:9px 13px}.platnav button{padding:7px 13px;font-size:12px}
 
-.equipebtn{gap:6px}@media(max-width:850px){.equipebtn span:not(.navbadge){display:none}}
+.equipebtn{gap:6px;white-space:nowrap}@media(max-width:850px){.equipebtn span:not(.navbadge){display:none}}
 
 .modswitch{grid-template-columns:repeat(4,1fr)}.modswitch button{font-size:9.5px;padding:8px 0}
 .kpibtn{text-align:left;display:block;width:100%;cursor:pointer}.kpibtn.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
@@ -127,3 +127,76 @@ table.dre tr.conta td:first-child{padding-left:30px}
 /* Logo sem fundo: integra ao tema, sem o quadro branco */
 .complogo{background:none;padding:0;margin:0 6px 18px;justify-content:flex-start}.complogo img{height:64px;filter:drop-shadow(0 2px 10px #0006)}.complogo.login img{height:72px}
 body.light .complogo img{filter:none}
+
+/* ═════════ EcomBalance ERP: estrutura, tipografia e espaçamento ═════════ */
+body{font-family:Manrope,'Segoe UI',system-ui,sans-serif;font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.num,.mono,.kpiv,.bankval{font-variant-numeric:tabular-nums}.mono{font-family:'JetBrains Mono',Consolas,monospace;font-size:13px}
+.erp{display:grid;grid-template-columns:78px 252px minmax(0,1fr);min-height:100vh}
+.erp .rail{position:sticky;top:0;height:100vh;background:#0b0e16;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0}
+body.light .erp .rail{background:#1b2035}
+.railbrand{width:44px;height:44px;border-radius:13px;background:var(--accent);color:#170e31;border:0;font-weight:800;font-size:16px;margin-bottom:16px;padding:0}
+.railbtn{width:64px;border:0;background:transparent;color:#8a93a9;display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 0;border-radius:12px;font-size:10.5px;font-weight:600}
+.railbtn:hover{background:#ffffff0d;color:#eff1fa;transform:none}.railbtn.on{background:#a88aff24;color:#c9b8ff}
+.erp aside.subnav{position:sticky;top:0;height:100vh;width:auto;transform:none;background:var(--panel);border-right:1px solid var(--line);padding:22px 16px;display:flex;flex-direction:column;overflow-y:auto;z-index:5}
+.subnav .complogo{margin:0 6px 18px}.subnav .complogo img{height:58px}
+.subtitle{font-size:19px;font-weight:700;letter-spacing:-.3px;padding:0 10px 6px}
+.erp .navlabel{font-size:11px;letter-spacing:1.4px;margin:18px 10px 6px;font-weight:700}
+.erp nav button{font-size:14px;padding:10px 12px;margin:1px 0;border-radius:10px;gap:11px;color:var(--muted)}
+.erp nav button span{flex:1;text-align:left}.erp nav button.active{color:var(--text);background:#a88aff1f;box-shadow:inset 3px 0 var(--accent);font-weight:600}
+.navcount{font-style:normal;font-size:11px;font-weight:700;background:#ff8d9f24;color:var(--red);border-radius:6px;padding:1px 7px}
+.platdot{width:9px;height:9px;border-radius:50%;flex:none!important}
+.erp main{margin-left:0;min-width:0}
+.erp header{height:70px;padding:0 32px;gap:14px;position:sticky;top:0;z-index:4;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px)}
+.wschip{white-space:nowrap;display:flex;align-items:center;gap:10px;padding:6px 14px 6px 6px;border-radius:12px;background:transparent;font-weight:600;font-size:14px}
+.wsmark{width:30px;height:30px;border-radius:9px;background:#66dfb522;color:var(--green);display:grid;place-items:center;font-size:12px;font-weight:800}
+.searchbox{flex:1;max-width:560px;justify-content:flex-start;gap:10px;background:var(--panel);color:var(--muted);font-size:14px;padding:10px 14px;border-radius:12px}
+.searchbox span{flex:1;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.searchbox kbd{font-family:'JetBrains Mono',monospace;font-size:11px;border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+.newbtn{padding:10px 16px;border-radius:11px;font-size:14px}.iconbtn{position:relative;width:42px;height:42px;padding:0;border-radius:11px}
+.belldot{position:absolute;top:4px;right:4px;font-style:normal;font-size:10px;font-weight:800;min-width:17px;height:17px;border-radius:9px;background:var(--gold);color:#1c1405;display:grid;place-items:center;padding:0 4px}
+.erp .content{max-width:1680px;padding:30px 36px 48px}
+.pagehead{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;margin-bottom:28px}
+.pagehead h1{font-size:30px;font-weight:700;letter-spacing:-.8px;margin:6px 0 6px}.pagehead p{font-size:14.5px;max-width:760px}
+.crumb{font-size:13px;color:var(--muted);font-weight:500}.crumb span{margin:0 6px;opacity:.6}
+.monthsel{display:flex;align-items:center;gap:8px;margin:0;border:1px solid var(--line);background:var(--panel);border-radius:11px;padding:0 4px 0 12px;color:var(--muted)}.monthsel select{border:0;background:transparent;font-size:14px;padding:10px 8px}
+.erp .card{padding:24px;border-radius:14px}.erp .cardhead{margin-bottom:18px}.erp h2{font-size:17px}
+.erp .caption{font-size:12.5px}.erp table{font-size:14px}.erp th{font-size:11.5px;padding:13px 18px;letter-spacing:.6px}.erp td{padding:14px 18px}
+.erp .metric .label{font-size:13px}.erp .metric .value{font-size:27px}.erp .metric small{font-size:12px}
+.erp .grid{gap:18px}.erp .metrics{margin-bottom:24px}.erp .tabletop{padding:18px 22px}.erp .badge{font-size:11.5px;padding:4px 9px}
+.erp input,.erp select,.erp textarea{font-size:14px;padding:10px 12px;border-radius:9px}.erp button{font-size:14px}.erp .small{font-size:13px;padding:8px 12px}
+.erp label{font-size:13px}.erp .notice{font-size:13.5px;padding:16px 20px}.erp .listline{font-size:14px;padding:14px 0}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);margin-bottom:20px}
+.toolbar>button,.toolbar>label.upbtn{padding:9px 14px}.dangerbtn{color:var(--red)}.check-l{display:flex;align-items:center;gap:8px;margin:0;color:var(--muted);font-size:13px}
+.searchin{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--panel2);color:var(--muted)}.searchin input{border:0;background:transparent;min-width:260px;padding:9px 4px}
+.formhead{display:flex;align-items:center;gap:16px;margin:4px 0 18px}.formhead h2{font-size:22px;margin:2px 0 0}.formicon{width:52px;height:52px;border-radius:14px;background:#a88aff1f;color:var(--accent);display:grid;place-items:center}
+.formcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 26px 22px}
+.formcard fieldset{border:0;border-bottom:1px solid var(--line);padding:18px 0 22px;margin:0}.formcard fieldset:last-child{border-bottom:0}
+.formcard legend{font-size:12px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--accent);padding:0;margin-bottom:12px;float:left;width:100%}
+.formgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 18px;clear:both}.field label{margin:0 0 6px;font-weight:600;color:var(--muted)}.field input,.field select,.field textarea{width:100%}
+.field input[readonly]{opacity:.7}.gridtable tr.inativo td{opacity:.5}.tablefoot{padding:12px 18px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+.lancgrid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}.parcelas{padding:20px 22px;position:sticky;top:90px}.parcelas h3{font-size:15px;margin-bottom:10px}
+.parcelas table{font-size:13.5px}.parcelas td,.parcelas th{padding:6px 4px}.parcelas input{width:100%;padding:7px 8px;font-size:13px}
+.kpis4{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:20px}.kpi{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;width:100%}.kpil{font-size:13px;color:var(--muted)}.kpiv{font-size:28px;font-weight:700;letter-spacing:-.6px}.kpis{font-size:12.5px;color:var(--muted)}
+.kpis4.small .card{padding:16px 18px;display:flex;flex-direction:column;gap:4px}.kpis4.small strong{font-size:20px}.kpis4.small small{color:var(--muted);font-size:12px}
+.central2{grid-template-columns:minmax(0,1.6fr) minmax(340px,1fr)}.cashchart{width:100%;height:auto;display:block}.cashchart .grid{stroke:var(--line)}.cashchart .en{fill:var(--green);opacity:.7}.cashchart .sa{fill:var(--red);opacity:.7}.cashchart .saldo{fill:none;stroke:var(--accent);stroke-width:2.5}.cashchart text{fill:var(--muted);font-size:11px}
+.minis{margin-top:16px}.minis>div{background:var(--panel2);border-radius:11px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}.minis small{color:var(--muted);font-size:12px}.minis strong{font-size:17px}
+.tarefa{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--line)}.tarefa>div{flex:1;display:flex;flex-direction:column}.tarefa small{color:var(--muted);font-size:12.5px}
+.avico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none;background:#a88aff1c;color:var(--accent)}.avico.bad{background:#ff8d9f1c;color:var(--red)}.avico.warn{background:#edc47b1c;color:var(--gold)}.avico.ok{background:#66dfb51c;color:var(--green)}
+.dropmenu{position:fixed;z-index:90;min-width:320px;max-width:420px;background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:8px}
+.drophead,.bggroup{font-size:11px;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);font-weight:700;padding:10px 12px 6px}
+.dropitem{width:100%;border:0;background:transparent;justify-content:flex-start;gap:12px;padding:10px 12px;border-radius:10px;text-align:left}.dropitem:hover{background:var(--panel2);transform:none}
+.dropitem span{display:flex;flex-direction:column}.dropitem small{color:var(--muted);font-size:12px;font-weight:400}.dropitem strong{font-weight:600;font-size:14px}.bgres{max-height:60vh;overflow:auto;margin-top:12px}
+.bankgrid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}.bankcard{text-align:left;display:flex;flex-direction:column;align-items:stretch;gap:6px;width:100%}.bankcard.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}.bankval{font-size:24px;font-weight:700;letter-spacing:-.4px}
+.concgrid{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}
+.conchead,.concrow{display:grid;grid-template-columns:minmax(0,1fr) 64px minmax(0,1fr)}.conchead{background:var(--panel2);font-size:11.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:700}.conchead span{padding:12px 18px}
+.concrow{border-top:1px solid var(--line);min-height:70px}.concrow.warn{background:#edc47b07}.concrow.bad{background:#ff8d9f07}
+.concl,.concr{display:flex;align-items:center;gap:12px;padding:12px 18px;min-width:0;font-size:14px}.concm{display:grid;place-items:center;background:var(--panel2);border-left:1px solid var(--line);border-right:1px solid var(--line)}
+.concmark{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:#99a2b81f;color:var(--muted)}.concmark.ok{background:#66dfb522;color:var(--green)}.concmark.warn{background:#edc47b22;color:var(--gold)}.concmark.bad{background:#ff8d9f22;color:var(--red)}
+.ellipsis{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.concl .caption,.concr .caption{font-size:12.5px}
+.relgrid{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px;align-items:start}.rellist{padding:16px;display:flex;flex-direction:column;position:sticky;top:90px}
+.rellist button{border:0;background:transparent;justify-content:flex-start;gap:10px;padding:10px 12px;border-radius:10px;color:var(--muted);text-align:left;font-size:14px}.rellist button.active{background:#a88aff1f;color:var(--text);font-weight:600}.rellist button:hover{transform:none;color:var(--text)}
+.relhead{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}.relhead h2{font-size:20px}.relparams{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;padding:14px 18px;border:1px solid var(--line);border-radius:14px;background:var(--panel);margin-bottom:16px}.relparams .field{min-width:180px}
+.relbody{padding:0;overflow:hidden}.relbody>p{padding:14px 18px 0}.reltable tfoot td{border-top:2px solid var(--line);background:var(--panel2)}.relsub{font-size:14px;padding:18px 18px 4px;margin:0}.printhead{display:none}
+@media(max-width:1180px){.erp{grid-template-columns:72px 220px minmax(0,1fr)}.kpis4{grid-template-columns:repeat(2,minmax(0,1fr))}.central2,.lancgrid,.relgrid{grid-template-columns:1fr}.formgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.searchbox span{display:none}}
+@media(max-width:760px){.erp{grid-template-columns:1fr}.erp .rail{position:fixed;left:0;top:0;z-index:30;transform:translateX(-100%);transition:.2s}.erp aside.subnav{position:fixed;left:78px;top:0;width:260px;z-index:30;transform:translateX(-120%);transition:.2s}
+ body.menu .erp .rail,body.menu .erp aside.subnav{transform:none}.erp .mobilemenu{display:inline-flex}.erp header{padding:0 16px}.wschip .wsname,.hdrright .demo,.equipebtn span:not(.navbadge){display:none}.erp .content{padding:22px 16px}.kpis4{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}.formgrid .field{grid-column:auto!important}.pagehead{flex-direction:column;align-items:flex-start}.conchead,.concrow{grid-template-columns:1fr}.concm{display:none}.searchin input{min-width:0}}
+@media print{.erp{display:block}.erp .rail,.erp aside.subnav,.erp header,.toolbar,.pageactions,.relparams,.rellist,.relhead .row,#assistant,.footer{display:none!important}.relgrid{display:block}.printhead{display:block;margin-bottom:12px;font-size:12px}.erp .content{padding:0}.pagehead{margin-bottom:8px}.pagehead p{display:none}}
