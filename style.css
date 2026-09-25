@@ -59,3 +59,42 @@ aside{overflow-y:auto}aside>*{flex-shrink:0}.brand small{font-size:9px;letter-sp
 @media(max-width:1150px){.segs{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:620px){.segs{grid-template-columns:repeat(2,1fr)}.fab{right:16px;bottom:16px}.ufmap{grid-template-rows:repeat(8,38px)}input[type=search]{min-width:0}}
 @media print{.fab,.drawer{display:none!important}}
+
+/* ───────── Gestão: contabilidade, preços e simulador ───────── */
+.segtabs{display:flex;gap:4px;padding:4px;background:var(--panel2);border:1px solid var(--line);border-radius:11px;margin-bottom:20px;overflow-x:auto;width:max-content;max-width:100%}
+.segtabs button{border:0;background:transparent;color:var(--muted);padding:8px 14px;border-radius:8px;white-space:nowrap;font-size:13px}
+.segtabs button.active{background:var(--panel);color:var(--text);box-shadow:0 1px 0 var(--line),0 4px 14px #0002}
+.segtabs button:hover{transform:none;color:var(--text)}
+table.dre td,table.dre th{padding:9px 14px}
+table.dre tr.total td{font-weight:650;background:var(--panel2);border-top:1px solid var(--line)}
+table.dre tr.total:last-child td{color:var(--accent)}
+.colchart{display:flex;gap:10px;align-items:flex-end;height:170px;padding:6px 0 0}
+.col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0;height:100%}
+.colbars{flex:1;width:100%;display:flex;gap:3px;align-items:flex-end;justify-content:center}
+.colbars i{width:40%;max-width:22px;border-radius:4px 4px 0 0;min-height:2px}
+.col span{font-size:10px;color:var(--muted);white-space:nowrap}
+.upbtn{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line);background:var(--panel2);padding:7px 10px;border-radius:9px;font-size:12px;color:var(--text);cursor:pointer;margin:0}
+.upbtn:hover{border-color:var(--accent)}
+.pricetable td,.pricetable th{padding:10px 12px}
+.pricetable tbody tr{cursor:pointer}
+.rulegrid{display:grid;grid-template-columns:1fr auto;gap:8px 14px;align-items:center}
+.rulegrid label{margin:0}
+.inp{display:flex;align-items:center;gap:6px}
+.inp input{width:96px;text-align:right}
+.inp span{font-size:11px;color:var(--muted);width:20px}
+.simgrid{grid-template-columns:minmax(280px,360px) 1fr;align-items:start}
+.simgrid>.card{position:sticky;top:12px}
+.sl{margin:12px 0 4px}
+.sl label{margin:0}
+.sl input[type=range]{width:100%;accent-color:#a88aff;padding:0;margin-top:6px;background:transparent;border:0}
+.slv{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+.slv input{width:86px;padding:4px 8px;text-align:right;font-size:12px}
+.stackbar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--line);margin-bottom:14px}
+.stackbar i{height:100%;display:block}
+.waterfall .listline{padding:8px 0}
+.waterfall .listline.total{font-weight:650;border-top:1px solid var(--line)}
+table.sens td,table.sens th{padding:8px 10px;text-align:center}
+.heat{display:inline-block;min-width:58px;padding:4px 6px;border-radius:6px;font-size:11px;font-weight:600}
+.heat.ok{background:#66dfb522;color:var(--green)}.heat.warn{background:#edc47b22;color:var(--gold)}.heat.bad{background:#ff8d9f22;color:var(--red)}
+@media(max-width:1150px){.simgrid{grid-template-columns:1fr}.simgrid>.card{position:static}}
+@media(max-width:620px){.rulegrid{grid-template-columns:1fr}.inp input{width:100%}}

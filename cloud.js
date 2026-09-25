@@ -26,28 +26,42 @@ const maps={
  imports:{table:'imports',key:'id',
   toRow:i=>({id:i.id,file:i.file,type:i.type,count:i.count,format:i.format||null,time:i.time}),
   fromRow:r=>({id:r.id,file:r.file,type:r.type,count:r.count,format:r.format,time:r.time})},
+ accLines:{table:'accounting_lines',key:'id',
+  toRow:l=>({id:l.id,month:l.month,kind:l.kind,conta:l.conta,descricao:l.descricao||null,data:l.data||null,historico:l.historico||null,debito:l.debito||0,credito:l.credito||0,saldo_anterior:l.saldoAnterior??null,saldo:l.saldo??null}),
+  fromRow:r=>({id:r.id,month:r.month,kind:r.kind,conta:r.conta,descricao:r.descricao||'',data:r.data||null,historico:r.historico||'',debito:n(r.debito),credito:n(r.credito),saldoAnterior:r.saldo_anterior==null?null:n(r.saldo_anterior),saldo:r.saldo==null?null:n(r.saldo)})},
+ accDocs:{table:'accounting_docs',key:'id',
+  toRow:d=>({id:d.id,month:d.month,tipo:d.tipo,nome:d.nome,path:d.path||null,size:d.size||null,time:d.time}),
+  fromRow:r=>({id:r.id,month:r.month,tipo:r.tipo,nome:r.nome,path:r.path,size:r.size,time:r.time})},
+ products:{table:'pricing_products',key:'id',
+  toRow:p=>({id:p.id,nome:p.nome||null,categoria:p.categoria||null,custo:p.custo||0,embalagem:p.embalagem||0,peso:p.peso??null,precos:p.precos||{},extra:p.extra||{}}),
+  fromRow:r=>({id:r.id,nome:r.nome||'',categoria:r.categoria||'',custo:n(r.custo),embalagem:n(r.embalagem),peso:r.peso==null?null:n(r.peso),precos:r.precos||{},extra:r.extra||{}})},
+ scenarios:{table:'pricing_scenarios',key:'id',
+  toRow:s=>({id:s.id,nome:s.nome,data:s.data,time:s.time}),
+  fromRow:r=>({id:r.id,nome:r.nome,data:r.data,time:r.time})},
  audit:{table:'audit_log',key:'id',insertOnly:true,
   toRow:a=>({id:a.id,time:a.time,action:a.action,detail:a.detail||'',actor:a.actor||Cloud.session?.user?.email||null}),
   fromRow:r=>({id:r.id,time:r.time,action:r.action,detail:r.detail,actor:r.actor})},
 };
-const listOf={orders:()=>db.orders,receipts:()=>db.receipts,ledger:()=>db.ledger,imports:()=>db.imports,audit:()=>db.audit};
+const listOf={orders:()=>db.orders,receipts:()=>db.receipts,ledger:()=>db.ledger,imports:()=>db.imports,audit:()=>db.audit,accLines:()=>db.accLines||[],accDocs:()=>db.accDocs||[],products:()=>db.products||[],scenarios:()=>db.scenarios||[]};
 let snap={};           // último estado gravado: coleção → Map(id → JSON)
 let flushTimer=null,flushing=null,dirty=false;
 
 function ensureIds(){for(const i of db.imports)i.id=i.id||uid();for(const a of db.audit)a.id=a.id||uid()}
 function snapshot(){ensureIds();snap={};for(const [k,m] of Object.entries(maps))snap[k]=new Map(listOf[k]().map(x=>[x[m.key],JSON.stringify(m.toRow(x))]));
- snap.crm=new Map(Object.entries(db.crm||{}).map(([id,c])=>[id,JSON.stringify(c)]));snap.closures=new Map(Object.entries(db.closures||{}).map(([m,c])=>[m,JSON.stringify(c)]));snap.settings=JSON.stringify(settingsOf())}
-function settingsOf(){return {theme:db.theme}}
+ snap.crm=new Map(Object.entries(db.crm||{}).map(([id,c])=>[id,JSON.stringify(c)]));snap.accMap=new Map(Object.entries(db.accMap||{}).map(([id,c])=>[id,JSON.stringify(c)]));snap.closures=new Map(Object.entries(db.closures||{}).map(([m,c])=>[m,JSON.stringify(c)]));snap.settings=JSON.stringify(settingsOf())}
+function settingsOf(){return {theme:db.theme,pricing:db.pricing||null}}
 
 async function pageAll(table){let out=[],from=0;for(;;){const {data,error}=await sb.from(table).select('*').eq('workspace_id',Cloud.ws).range(from,from+999);if(error)throw error;out.push(...data);if(data.length<1000)return out;from+=1000}}
 
 async function load(){
  Cloud.state='loading';
- const [orders,receipts,ledger,imports,audit,crm,closures,settings]=await Promise.all(['orders','receipts','ledger','imports','audit_log','crm_contacts','closures','workspace_settings'].map(pageAll));
+ const [orders,receipts,ledger,imports,audit,crm,closures,settings,accLines,accMap,accDocs,products,scenarios]=await Promise.all(['orders','receipts','ledger','imports','audit_log','crm_contacts','closures','workspace_settings','accounting_lines','account_map','accounting_docs','pricing_products','pricing_scenarios'].map(pageAll));
  const next={orders:orders.map(maps.orders.fromRow),receipts:receipts.map(maps.receipts.fromRow),ledger:ledger.map(maps.ledger.fromRow),
   imports:imports.map(maps.imports.fromRow).sort((a,b)=>b.time.localeCompare(a.time)),audit:audit.map(maps.audit.fromRow).sort((a,b)=>b.time.localeCompare(a.time)),
   crm:Object.fromEntries(crm.map(c=>[c.id,{stage:c.stage,tags:c.tags||[],notes:c.notes||'',interactions:c.interactions||[]}])),
-  closures:Object.fromEntries(closures.map(c=>[c.month,c.data])),theme:settings[0]?.data?.theme||db.theme||'dark',schemaVersion:2};
+  closures:Object.fromEntries(closures.map(c=>[c.month,c.data])),theme:settings[0]?.data?.theme||db.theme||'dark',schemaVersion:2,
+  accLines:accLines.map(maps.accLines.fromRow),accMap:Object.fromEntries(accMap.map(a=>[a.conta,{linha:a.linha,descricao:a.descricao||''}])),accDocs:accDocs.map(maps.accDocs.fromRow),
+  products:products.map(maps.products.fromRow),scenarios:scenarios.map(maps.scenarios.fromRow),pricing:settings[0]?.data?.pricing||undefined};
  db=next;paymentIndex=null;snapshot();Cloud.state='saved';
  document.body.classList.toggle('light',db.theme==='light');
  const months=[...new Set(db.orders.map(o=>o.date.slice(0,7)))].sort();
@@ -74,6 +88,10 @@ async function flush(){
    const crmRows=[...crmNow].filter(([id,j])=>snap.crm.get(id)!==j).map(([id,j])=>{const c=JSON.parse(j);return {workspace_id:ws,id,stage:c.stage||'Novo',tags:c.tags||[],notes:c.notes||'',interactions:c.interactions||[],updated_at:new Date().toISOString()}});
    if(crmRows.length){const {error}=await sb.from('crm_contacts').upsert(crmRows,{onConflict:'workspace_id,id'});if(error)throw error}
    snap.crm=crmNow;
+   const amNow=new Map(Object.entries(db.accMap||{}).map(([id,c])=>[id,JSON.stringify(c)]));
+   const amRows=[...amNow].filter(([id,j])=>snap.accMap?.get(id)!==j).map(([conta,j])=>{const c=JSON.parse(j);return {workspace_id:ws,conta,linha:c.linha,descricao:c.descricao||null}});
+   if(amRows.length){const {error}=await sb.from('account_map').upsert(amRows,{onConflict:'workspace_id,conta'});if(error)throw error}
+   snap.accMap=amNow;
    const clNow=new Map(Object.entries(db.closures||{}).map(([m,c])=>[m,JSON.stringify(c)]));
    const clRows=[...clNow].filter(([m,j])=>snap.closures.get(m)!==j).map(([m,j])=>({workspace_id:ws,month:m,data:JSON.parse(j)}));
    if(clRows.length){const {error}=await sb.from('closures').upsert(clRows,{onConflict:'workspace_id,month'});if(error)throw error}
