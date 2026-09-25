@@ -126,6 +126,34 @@ Deno.serve(handler(async (req) => {
   const { db } = await authorize(req, ws);
 
   switch (action) {
+    case "cnpj": {
+      // Consulta completa do CNPJá (Receita, Simples/MEI, inscrição estadual, SUFRAMA). A chave fica só no servidor.
+      const key = Deno.env.get("CNPJA_API_KEY");
+      if (!key) throw new HttpError(400, "A chave da API do CNPJá ainda não foi cadastrada no servidor.");
+      const cnpj = String(body.cnpj ?? "").replace(/\D/g, "");
+      if (cnpj.length !== 14) throw new HttpError(400, "Informe um CNPJ com 14 dígitos.");
+      const q = new URLSearchParams({ simples: "true", registrations: "ORIGIN", suframa: "true", strategy: "CACHE_IF_FRESH", maxAge: "30" });
+      const r = await fetch(`https://api.cnpja.com/office/${cnpj}?${q}`, { headers: { Authorization: key } });
+      const o: any = await r.json().catch(() => ({}));
+      if (r.status === 404) throw new HttpError(404, "CNPJ não encontrado na Receita Federal.");
+      if (!r.ok) throw new HttpError(502, `CNPJá respondeu ${r.status}: ${o?.message ?? "erro na consulta"}`);
+      const a = o.address ?? {}, c = o.company ?? {};
+      const fone = (p: any) => p?.number ? `(${p.area}) ${String(p.number).replace(/(\d{4,5})(\d{4})$/, "$1-$2")}` : "";
+      const ie = (o.registrations ?? []).find((x: any) => x.enabled) ?? (o.registrations ?? [])[0];
+      const fmt = cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+      return json({
+        razao: c.name ?? "", fantasia: o.alias ?? "", doc: fmt, tipoPessoa: "Jurídica", ie: ie ? `${ie.number}${ie.enabled ? "" : " (inativa)"}` : "",
+        situacao: o.status?.text ?? "", desde: o.founded ?? "", natureza: c.nature?.text ?? "", porte: c.size?.text ?? "",
+        regime: c.simei?.optant ? "MEI" : c.simples?.optant ? "Simples Nacional" : "Lucro Presumido / Real",
+        capital: c.equity ?? null, atividade: o.mainActivity ? `${o.mainActivity.id} · ${o.mainActivity.text}` : "",
+        secundarias: (o.sideActivities ?? []).map((x: any) => `${x.id} · ${x.text}`).join("\n"),
+        cep: a.zip ? String(a.zip).replace(/^(\d{5})(\d{3})$/, "$1-$2") : "", endereco: a.street ?? "", numero: a.number ?? "", bairro: a.district ?? "",
+        complemento: a.details ?? "", cidade: a.city ?? "", uf: a.state ?? "",
+        telefone: fone(o.phones?.[0]), telefone2: fone(o.phones?.[1]), email: o.emails?.[0]?.address ?? "",
+        socios: (c.members ?? []).map((m: any) => `${m.person?.name ?? ""}${m.role?.text ? " · " + m.role.text : ""}`).join("\n"),
+        suframa: o.suframa?.[0]?.number ?? "", receitaEm: new Date().toISOString().slice(0, 10),
+      });
+    }
     case "status": {
       const available = Object.fromEntries(Object.keys(providers).map((k) => [k, required[k].every((n) => Deno.env.get(n))]));
       const ai = !!Deno.env.get("ANTHROPIC_API_KEY");
