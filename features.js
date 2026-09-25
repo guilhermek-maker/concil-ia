@@ -107,7 +107,7 @@ async function loadIntegrations(){if(!window.Cloud?.ws)return;try{const [st,{dat
 window.Integrations={load:loadIntegrations,callFn,state:integ};
 function syncRange(){const t=today();if(fx.syncRange==='30')return [new Date(Date.now()-30*864e5).toLocaleDateString('sv-SE'),t];if(fx.syncRange==='90')return [new Date(Date.now()-90*864e5).toLocaleDateString('sv-SE'),t];const last=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).toLocaleDateString('sv-SE');return [month+'-01',last>t?t:last]}
 function integrationsView(){
- if(!window.Cloud?.enabled)return `<div class="hero"><div><div class="eyebrow">Modo local</div><h2>Conecte a nuvem para integrar as plataformas.</h2><p>As integrações automáticas com Bling, Mercado Livre, Shopee e Magalu e o assistente de IA funcionam com o banco na nuvem (Supabase). Enquanto isso, os dados ficam neste navegador e entram por importação de relatórios.</p><div class="row"><button class="primary" data-nav="imports">${icon('upload')} Importar relatórios</button></div></div></div><div class="card"><h2>Como ativar</h2><p>Siga o guia <a class="purple" href="https://github.com/guilhermek-maker/fechai/blob/main/docs/CONFIGURAR.md" target="_blank" rel="noopener">docs/CONFIGURAR.md</a>: criar o projeto no Supabase, cadastrar os segredos e publicar. Leva cerca de 15 minutos.</p></div>`;
+ if(!window.Cloud?.enabled)return `<div class="hero"><div><div class="eyebrow">Modo local</div><h2>Conecte a nuvem para integrar as plataformas.</h2><p>As integrações automáticas com Bling, Mercado Livre, Shopee e Magalu e o assistente de IA funcionam com o banco na nuvem (Supabase). Enquanto isso, os dados ficam neste navegador e entram por importação de relatórios.</p><div class="row"><button class="primary" data-nav="imports">${icon('upload')} Importar relatórios</button></div></div></div><div class="card"><h2>Como ativar</h2><p>Siga o guia <a class="purple" href="https://github.com/guilhermek-maker/ecombalance/blob/main/docs/CONFIGURAR.md" target="_blank" rel="noopener">docs/CONFIGURAR.md</a>: criar o projeto no Supabase, cadastrar os segredos e publicar. Leva cerca de 15 minutos.</p></div>`;
  if(!integ.loaded){loadIntegrations();return '<div class="empty">Carregando integrações…</div>'}
  const st=integ.status||{},[from,to]=syncRange();
  return `${st.error?`<div class="notice red"><strong>Funções do servidor indisponíveis.</strong> ${esc(st.error)}. Verifique se as Edge Functions foram publicadas (docs/CONFIGURAR.md).</div>`:''}
@@ -165,7 +165,7 @@ function decorate(){const cloud=window.Cloud?.enabled&&Cloud.ws;
  const email=window.Cloud?.session?.user?.email||'';$$('.avatar').forEach(a=>{if(email){a.textContent=email.slice(0,2).toUpperCase();a.title=email}});
  const hdrAvatar=$('header .row:last-child .avatar');if(cloud&&hdrAvatar)hdrAvatar.insertAdjacentHTML('afterend',`<button class="quiet small" data-cloud="logout" title="Sair" aria-label="Sair">${icon('logout')}</button>`);
  const bottom=$('.asidebottom .row div');if(bottom&&cloud)bottom.innerHTML=`${esc(Cloud.wsName)}<br><span style="font-size:10px">${esc(email)}</span>`;
- const foot=$('.footer span');if(foot&&cloud)foot.textContent='Fechaí / Dados na nuvem · Integrações via API oficial das plataformas';
+ const foot=$('.footer span');if(foot&&cloud)foot.textContent='EcomBalance / Dados na nuvem · Integrações via API oficial das plataformas';
  if(cloud)$$('.caption').forEach(c=>{if(c.textContent==='Importação manual · sem conexão com APIs')c.textContent='API oficial + importação de relatórios'});
  if(page==='dashboard'&&db.orders.length){const anchor=$('#view .grid.platformgrid');if(anchor)anchor.insertAdjacentHTML('afterend',dashboardExtras())}
  if(page==='dashboard'&&cloud&&db.orders.length){const row=$('#view .hero .row');if(row)row.insertAdjacentHTML('beforeend',`<button class="small" data-ai-go="Faça a análise executiva da competência: resultado por plataforma, o que está pendente de conciliação, divergências relevantes, destaques de produtos, estados e clientes, e os 3 próximos passos.">${icon('spark')} Análise da IA</button>`)}
@@ -180,7 +180,7 @@ function bindFx(){const on=(id,k,rerender=true)=>{const el=$('#'+id);if(el)el[el
  $('#batchAll')?.addEventListener('change',e=>$$('[data-batch]').forEach(c=>c.checked=e.target.checked));
 }
 
-function exportRows(name,rows){download(`Fechai_${name}_${fx.period==='mes'?month:fx.period}.csv`,csv(rows));toast('Arquivo CSV gerado.')}
+function exportRows(name,rows){download(`EcomBalance_${name}_${fx.period==='mes'?month:fx.period}.csv`,csv(rows));toast('Arquivo CSV gerado.')}
 const customerCsv=list=>[['cliente','documento','email','telefone','cidade','uf','segmento','estagio','etiquetas','compras','total','ticket','primeira_compra','ultima_compra','dias_sem_comprar'],...list.map(c=>[c.name,c.doc,c.email,c.phone,c.city,c.state,c.segment,c.crm.stage,c.crm.tags.join(', '),c.count,c.total,c.ticket,c.first,c.last,c.recency])];
 
 document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b||b.disabled)return;const d=b.dataset;
@@ -192,7 +192,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('button');i
   c.stage=$('#crmStage').value;c.tags=$('#crmTags').value.split(',').map(s=>s.trim()).filter(Boolean);c.notes=$('#crmNotes').value;const text=$('#crmText').value.trim();if(text)c.interactions.unshift({time:new Date().toISOString(),type:$('#crmType').value,text,due:$('#crmDue').value||null,done:false});
   audit('Cliente atualizado',`${key}: estágio ${c.stage}${text?' · novo registro':''}`);closeModal();render();toast('Cliente salvo.');return}
  if(d.fxConnect){try{b.disabled=true;const r=await callFn('integrations',{action:'authorize',provider:d.fxConnect,return_url:location.origin+location.pathname});location.href=r.url}catch(err){toast(err.message);b.disabled=false}return}
- if(d.fxDisconnect){modal('Desconectar',`<p>Remover o acesso do Fechaí a ${esc(d.fxDisconnect)}? Os dados já sincronizados permanecem.</p><div class="modalfoot"><button data-action="close">Cancelar</button><button class="primary" data-fx-disconnect-ok="${esc(d.fxDisconnect)}">Desconectar</button></div>`);return}
+ if(d.fxDisconnect){modal('Desconectar',`<p>Remover o acesso do EcomBalance a ${esc(d.fxDisconnect)}? Os dados já sincronizados permanecem.</p><div class="modalfoot"><button data-action="close">Cancelar</button><button class="primary" data-fx-disconnect-ok="${esc(d.fxDisconnect)}">Desconectar</button></div>`);return}
  if(d.fxDisconnectOk){try{await callFn('integrations',{action:'disconnect',provider:d.fxDisconnectOk});audit('Integração desconectada',d.fxDisconnectOk);closeModal();loadIntegrations()}catch(err){toast(err.message)}return}
  if(d.fxSync){runSync(d.fxSync);return}
  if(d.fxSample){modal('Amostra do último registro recebido',`<p class="caption">Use para conferir o formato que a plataforma devolve. Não contém tokens.</p><pre class="sample">${esc(JSON.stringify(integ.rows[d.fxSample]?.settings?.amostra,null,2))}</pre>`);return}
