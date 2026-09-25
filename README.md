@@ -17,6 +17,8 @@ Conciliação financeira de e-commerce entre o **Bling** (ERP, origem fiscal) e 
 | Estados | Mapa do Brasil por receita, ticket médio por UF |
 | Clientes · CRM | Segmentos (VIP, Recorrente, Novo, Em risco, Inativo), estágios, etiquetas, contatos, follow-ups e listas para campanhas |
 | Importação | CSV, TSV, TXT, XLSX, XLS, ODS e PDF com texto, com mapeamento de colunas (inclui cliente, UF e produto opcionais) |
+| Contabilidade e Resultado | Razão e balancete do escritório (planilha ou PDF), PDFs anexados por competência, contas → DRE gerencial, confronto contabilidade × operação |
+| Preços e Simulador | Tabela de preços e custos, regras por canal, margem/mínimo/sugerido por produto, simulador com cascata, sensibilidade, projeção e cenários |
 | Fechamento, relatórios, auditoria | Fechamento mensal com ressalvas, retrato exportável, CSV para a contabilidade, trilha de auditoria |
 
 Princípio mantido desde a versão original: **nada financeiro é gravado sem confirmação humana.** Integrações e IA trazem e sugerem; você confirma.
@@ -57,6 +59,8 @@ npm run check      # sintaxe dos scripts
 | `web/importer.js` | Importação multiformato e mapeamento de colunas |
 | `web/features.js` | Integrações, entradas e saídas, produtos, estados, CRM, conciliação em lote, navegação por `#pagina` |
 | `web/assistant.js` | Painel do assistente e execução das ferramentas da IA |
+| `web/gestao.js` | Contabilidade e Resultado (razão, balancete, documentos, DRE gerencial) e Preços e Simulador |
+| `web/tableimport.js` | Importador genérico com mapeamento de colunas (planilhas, CSV, PDF) |
 | `web/cloud.js` | Login, carga do workspace e gravação incremental no Supabase |
 | `web/config.js` | URL e chave pública do Supabase (vazio = modo local) |
 | `supabase/migrations/` | Esquema, RLS e funções SQL |
