@@ -9,7 +9,7 @@ $regras = @{
   'ML_CLIENT_ID' = @(8, 30); 'ML_CLIENT_SECRET' = @(20, 60)
   'SHOPEE_PARTNER_ID' = @(4, 12); 'SHOPEE_PARTNER_KEY' = @(30, 100)
   'MAGALU_CLIENT_ID' = @(10, 80); 'MAGALU_CLIENT_SECRET' = @(10, 120)
-  'ANTHROPIC_API_KEY' = @(40, 200)
+  'ANTHROPIC_API_KEY' = @(40, 200); 'CNPJA_API_KEY' = @(20, 200)
 }
 if (-not $regras.ContainsKey($Nome)) { Write-Host "Nome inválido. Use um destes: $($regras.Keys -join ', ')"; exit 1 }
 
