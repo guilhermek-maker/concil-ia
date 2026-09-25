@@ -4,6 +4,7 @@
 // então fechar a página não interrompe nada.
 import { admin, authorize, env, handler, HttpError, json, signState } from "../_shared/common.ts";
 import { persist, provider, providers, validSecret } from "../_shared/store.ts";
+import { importShopeeIncome } from "../_shared/shopee_central.ts";
 
 const required: Record<string, string[]> = {
   bling: ["BLING_CLIENT_ID", "BLING_CLIENT_SECRET"],
@@ -95,6 +96,13 @@ Deno.serve(handler(async (req) => {
       } catch (e) { report.push({ workspace_id: i.workspace_id, provider: i.provider, error: String(e) }); }
     }
     return json({ report });
+  }
+
+  // Importação temporária da Central do Vendedor Shopee, protegida por IMPORT_KEY (definida só enquanto usada).
+  if (action === "import_shopee_income") {
+    const key = Deno.env.get("IMPORT_KEY");
+    if (!key || req.headers.get("x-import-key") !== key) throw new HttpError(401, "não autorizado");
+    return json(await importShopeeIncome(admin(), String(body.workspace_id), body.done ?? [], body.pend ?? []));
   }
 
   const ws = String(body.workspace_id ?? "");
