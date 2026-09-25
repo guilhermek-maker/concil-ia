@@ -171,7 +171,7 @@ function decorate(){const cloud=window.Cloud?.enabled&&Cloud.ws;
  const br=$('aside .brand');if(br&&!$('aside .complogo'))br.insertAdjacentHTML('beforebegin','<div class="complogo"><img src="brand/comprastore-transparente.png" alt="Compra Store"></div>');
  const demo=$('header .demo');if(demo){if(cloud){demo.outerHTML=`<span id="cloudStatus" class="badge"></span><button class="quiet small" data-cloud="reload" title="Recarregar dados da nuvem" aria-label="Recarregar dados">${icon('refresh')}</button>`;Cloud.paintStatus()}else demo.textContent='MODO LOCAL'}
  const email=window.Cloud?.session?.user?.email||'';$$('.avatar').forEach(a=>{if(email){a.textContent=email.slice(0,2).toUpperCase();a.title=email}});
- const hdrAvatar=$('header .row:last-child .avatar');if(cloud&&hdrAvatar){const n=(integ.reqs||[]).length;hdrAvatar.insertAdjacentHTML('beforebegin',`<button class="quiet small equipebtn" data-nav="equipe" title="Equipe e acessos">${icon('users')}<span>Equipe e acessos</span>${n?`<span class="navbadge" style="background:#edc47b30;color:var(--gold)">${n}</span>`:''}</button>`);hdrAvatar.insertAdjacentHTML('afterend',`<button class="quiet small" data-cloud="logout" title="Sair" aria-label="Sair">${icon('logout')}</button>`)};
+ 
  const bottom=$('.asidebottom .row div');if(bottom&&cloud)bottom.innerHTML=`${esc(Cloud.wsName)}<br><span style="font-size:10px">${esc(email)}</span>`;
  const foot=$('.footer span');if(foot&&cloud)foot.textContent='EcomBalance / Dados na nuvem · Integrações via API oficial das plataformas';
  if(cloud)$$('.caption').forEach(c=>{if(c.textContent==='Importação manual · sem conexão com APIs')c.textContent='API oficial + importação de relatórios'});

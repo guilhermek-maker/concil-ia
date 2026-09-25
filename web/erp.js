@@ -29,7 +29,7 @@ const GERAL=['equipe','ai','history'];
 const modDe=p=>platforms[p]?'ven':MODS.find(m=>m.grupos.some(([,ids])=>ids.includes(p)))?.id;
 let modAtual=modDe(page)||'ini';
 const menuAberto=new Set((()=>{try{return JSON.parse(localStorage.getItem('eb_menu')||'[]')}catch{return []}})());
-const menuFechado=new Set();
+const menuFechado=new Set();let menuSel=null;
 const salvarMenu=()=>{try{localStorage.setItem('eb_menu',JSON.stringify([...menuAberto]))}catch{}};
 const nomePag=id=>navItems.find(n=>n[0]===id)?.[2]||(platforms[id]?id:id);
 const ico=(n,s=18)=>icon(n).replace('class="icon"',`class="icon" style="width:${s}px;height:${s}px"`);
@@ -42,21 +42,20 @@ function avisos(){const c=contagens(),s=l=>money(round(l.reduce((a,t)=>a+saldoT(
  if(c.acessos)out.push(['warn','users',`${c.acessos} pedido(s) de acesso`,'Equipe e acessos','equipe']);
  return out}
 
-shell=function(){const pm=modDe(page);if(pm)modAtual=pm;const M=MODS.find(m=>m.id===modAtual)||MODS[0],cur=nomePag(page),av=avisos();
+let paginaAnterior=null;
+shell=function(){const pm=modDe(page);if(pm)modAtual=pm;if(page!==paginaAnterior){paginaAnterior=page;menuSel=null}const M=MODS.find(m=>m.id===modAtual)||MODS[0],cur=nomePag(page),av=avisos();
  const item=id=>{const n=navItems.find(x=>x[0]===id);if(!n)return '';const c=contagens();const badge=id==='pagar'&&c.vencidos.length?c.vencidos.length:id==='concbanco'&&c.extrato?c.extrato:id==='equipe'&&c.acessos?c.acessos:0;
   return `<button data-nav="${id}" class="${page===id?'active':''}">${ico(n[1],17)}<span>${n[2]}</span>${badge?`<em class="navcount">${badge}</em>`:''}</button>`};
  const meses=[...new Set([month,...db.orders.map(o=>o.date.slice(0,7)),...P().map(t=>t.vencimento.slice(0,7))])].filter(m=>m>='2020').sort().reverse().slice(0,36);
  const emp=esc(window.Cloud?.wsName||'Minha empresa');
  $('#app').innerHTML=`<div class="erp">
- <aside class="side"><button class="sidebrand" data-nav="central" aria-label="Início"><img src="brand/comprastore-transparente.png" alt="${emp}"><span><strong>EcomBalance</strong><small>ERP do e-commerce</small></span></button>
-  <nav class="menu" aria-label="Menu principal">${MODS.map(m=>{const ids=m.grupos.flatMap(([,l])=>l).filter(id=>navItems.some(n=>n[0]===id)),unico=ids.length===1&&!m.plataformas,ativo=m.id===M.id,aberto=menuAberto.has(m.id)||(ativo&&!menuFechado.has(m.id));
-   if(unico)return `<button class="mhead ${page===ids[0]?'active':''}" data-nav="${ids[0]}">${ico(m.ic,19)}<span>${m.t}</span></button>`;
-   return `<div class="mgroup ${aberto?'open':''} ${ativo?'cur':''}"><button class="mhead" data-mtoggle="${m.id}" aria-expanded="${aberto}">${ico(m.ic,19)}<span>${m.t}</span>${ico('chev',15)}</button>${aberto?`<div class="mitems">${m.grupos.map(([g,l])=>`${m.grupos.length>1?`<div class="mlabel">${g}</div>`:''}${l.map(item).join('')}`).join('')}${m.plataformas?`<div class="mlabel">Por plataforma</div>${Object.keys(platforms).map(p=>`<button data-nav="${p}" class="${page===p?'active':''}"><span class="platdot" style="background:${platforms[p].color}"></span><span>${p}</span></button>`).join('')}`:''}</div>`:''}</div>`}).join('')}</nav>
-  <nav class="menu menufoot">${GERAL.filter(id=>id!=='equipe').map(item).join('')}</nav></aside>
+ <aside class="side"><button class="sidebrand" data-nav="central" aria-label="Início"><span class="logotile"><img src="brand/comprastore.png" alt=""></span><span><strong>${emp}</strong><small>EcomBalance · ERP</small></span></button>
+  <nav class="menu" aria-label="Menu principal">${MODS.map(m=>{const ids=m.grupos.flatMap(([,l])=>l).filter(id=>navItems.some(n=>n[0]===id)),unico=ids.length===1&&!m.plataformas,ativo=m.id===M.id,aberto=(menuSel??M.id)===m.id;
+   if(unico)return `<button class="mhead ${page===ids[0]?'active':''}" data-nav="${ids[0]}">${ico(m.ic,20)}<span>${m.t}</span></button>`;
+   return `<div class="mgroup ${aberto?'open':''} ${ativo?'cur':''}"><button class="mhead" data-mtoggle="${m.id}" aria-expanded="${aberto}">${ico(m.ic,20)}<span>${m.t}</span>${ico('chev',15)}</button>${aberto?`<div class="mitems">${ids.map(item).join('')}${m.plataformas?Object.keys(platforms).map(p=>`<button data-nav="${p}" class="${page===p?'active':''}"><span class="platdot" style="background:${platforms[p].color}"></span><span>${p}</span></button>`).join(''):''}</div>`:''}</div>`}).join('')}</nav></aside>
  <main><header><button class="quiet mobilemenu" data-action="menu" aria-label="Abrir navegação">${icon('menu')}</button>
-  <button class="wschip" data-erp="empresa" title="Empresa"><span class="wsmark">${emp.slice(0,2).toUpperCase()}</span><span class="wsname">${emp}</span></button>
   <button class="searchbox" data-erp="busca">${ico('search',16)}<span>Buscar pedido, nota, fornecedor, título…</span><kbd>Ctrl K</kbd></button>
-  <div class="row hdrright" style="margin-left:auto"><button class="primary newbtn" data-erp="novo">${ico('plus',16)} Novo</button><button class="quiet iconbtn" data-erp="avisos" aria-label="Avisos">${ico('bell',19)}${av.length?`<i class="belldot">${av.length}</i>`:''}</button><button class="quiet iconbtn" data-action="theme" aria-label="Alternar tema claro e escuro" title="Tema claro / escuro">${ico(db.theme==='light'?'moon':'sun',18)}</button><span class="demo">BASE OPERACIONAL</span><span class="avatar">GK</span></div></header>
+  <div class="row hdrright" style="margin-left:auto"><button class="primary newbtn" data-erp="novo">${ico('plus',16)} Novo</button><button class="quiet iconbtn" data-erp="avisos" aria-label="Avisos">${ico('bell',19)}${av.length?`<i class="belldot">${av.length}</i>`:''}</button><span class="demo">BASE OPERACIONAL</span><button class="userbtn" data-erp="usuario" aria-label="Menu do usuário"><span class="avatar">GK</span>${contagens().acessos?'<i class="userdot"></i>':''}${ico('chev',14)}</button></div></header>
  <div class="content"><div class="pagehead"><div><div class="crumb">${esc(M.t)} <span>›</span> ${esc(cur)}</div><h1>${page==='central'?`Bom dia${window.Cloud?.session?.user?.email?'':''}`:esc(cur)}</h1><p>${subtitle()}</p></div>
   <div class="row wrap pageactions"><label class="monthsel">${ico('calendar',16)}<select id="month" aria-label="Competência">${meses.map(m=>`<option value="${m}" ${month===m?'selected':''}>${mesBR(m)}</option>`).join('')}</select></label></div></div>
  <div id="view"></div><div class="footer"><span>EcomBalance</span><span><span class="dot"></span>Seu controle começa com clareza.</span></div></div></main></div>
@@ -74,6 +73,14 @@ document.addEventListener('click',e=>{const dm=e.target.closest('.dropmenu');con
  if(a==='avisos'){const av=avisos();drop(`<div class="drophead">Avisos</div>${av.map(([tom,ic,t,s,nav])=>`<button class="dropitem" data-nav="${nav}"><span class="avico ${tom}">${ico(ic,16)}</span><span><strong>${t}</strong><small>${s}</small></span></button>`).join('')||'<p class="caption" style="padding:10px 14px">Nada pendente. ✓</p>'}`,b)}
  if(a==='empresa')drop(`<div class="drophead">${esc(window.Cloud?.wsName||'Empresa')}</div>${(window.Cloud?.workspaces||[]).length>1?Cloud.workspaces.map(w=>`<button class="dropitem" data-erp-ws="${esc(w.id)}"><span><strong>${esc(w.name)}</strong><small>${w.id===Cloud.ws?'aberta':''}</small></span></button>`).join(''):''}<button class="dropitem" data-nav="equipe">${ico('users',18)}<span><strong>Equipe e acessos</strong><small>Liberar usuários</small></span></button><button class="dropitem" data-nav="integracoes">${ico('plug',18)}<span><strong>Integrações</strong><small>Bling, marketplaces</small></span></button>`,b);
  if(a==='busca')busca();
+ if(a==='usuario'){const email=window.Cloud?.session?.user?.email||'',n=contagens().acessos,wss=window.Cloud?.workspaces||[];
+  drop(`<div class="userhead"><span class="avatar big">${esc(email.slice(0,2).toUpperCase()||'EB')}</span><span><strong>${esc(email||'Modo local')}</strong><small>${window.Cloud?.role==='owner'?'Administrador':'Membro'} · ${esc(window.Cloud?.wsName||'')}</small></span></div>
+  <button class="dropitem" data-nav="equipe">${ico('users',18)}<span><strong>Equipe e acessos</strong><small>Liberar usuários e papéis</small></span>${n?`<em class="navcount">${n}</em>`:''}</button>
+  <button class="dropitem" data-nav="history">${ico('clock',18)}<span><strong>Histórico e auditoria</strong><small>Quem fez o quê, e quando</small></span></button>
+  <button class="dropitem" data-nav="integracoes">${ico('plug',18)}<span><strong>Integrações</strong><small>Bling e marketplaces</small></span></button>
+  ${wss.length>1?wss.map(w=>`<button class="dropitem" data-erp-ws="${esc(w.id)}">${ico('folder',18)}<span><strong>${esc(w.name)}</strong><small>${w.id===Cloud.ws?'empresa aberta':'trocar para esta empresa'}</small></span></button>`).join(''):''}
+  <button class="dropitem" data-action="theme">${ico(db.theme==='light'?'moon':'sun',18)}<span><strong>Tema ${db.theme==='light'?'escuro':'claro'}</strong><small>Mudar a aparência</small></span></button>
+  ${window.Cloud?.ws?`<button class="dropitem" data-cloud="logout">${ico('logout',18)}<span><strong>Sair</strong><small>Encerrar a sessão</small></span></button>`:''}`,b)}
 });
 document.addEventListener('click',e=>{const g=e.target.closest('[data-erp-go]');if(g){const k=g.dataset.erpGo;$('#erpdrop').innerHTML='';if(k==='@extrato'){const i=document.createElement('input');i.type='file';i.multiple=true;i.accept='.ofx,.OFX,.csv,.xlsx,.xls';i.onchange=()=>Tesouraria.importarArquivos(i.files);i.click()}if(k==='@forn'){cadUI('fornecedores').modo='ficha';cadUI('fornecedores').id=null;navigate('fornecedores')}if(k==='@conta'){cadUI('cadcontas').modo='ficha';cadUI('cadcontas').id=null;navigate('cadcontas')}}
  const w=e.target.closest('[data-erp-ws]');if(w)Cloud.switchWs(w.dataset.erpWs)});
@@ -92,7 +99,7 @@ document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLower
 document.addEventListener('click',e=>{const b=e.target.closest('[data-cad-abrir]');if(!b)return;const [pg,id]=b.dataset.cadAbrir.split(':');closeModal();const u=cadUI(pg);u.modo='ficha';u.id=id;navigate(pg)},true);
 document.addEventListener('click',e=>{if(e.target.closest('#bgRes [data-nav],#bgRes [data-order],#bgRes [data-pg-nota]'))setTimeout(()=>{if(!e.target.closest('[data-order],[data-pg-nota]'))closeModal()},0)});
 // Troca de módulo pela barra: abre a primeira tela do módulo.
-document.addEventListener('click',e=>{const b=e.target.closest('[data-mtoggle]');if(!b)return;e.stopImmediatePropagation();const id=b.dataset.mtoggle,g=b.closest('.mgroup');if(g.classList.contains('open')){menuAberto.delete(id);menuFechado.add(id)}else{menuAberto.add(id);menuFechado.delete(id)}salvarMenu();render()},true);
+document.addEventListener('click',e=>{const b=e.target.closest('[data-mtoggle]');if(!b)return;e.stopImmediatePropagation();const id=b.dataset.mtoggle,g=b.closest('.mgroup');menuSel=g.classList.contains('open')?'__nenhum':id;shell();$('#view').innerHTML='';render()},true);
 
 // ═════════════════ Central do dia ═════════════════
 function projecao(dias=30){const h=hoje(),s=window.Tesouraria?.saldos()||{total:0,contas:[]};let saldo=s.total;const serie=[];
@@ -135,7 +142,7 @@ const FORMAS=['Boleto','PIX','Transferência','Cartão de crédito','Débito aut
 const generico=tipo=>({lista:()=>C(tipo),get:id=>C(tipo).find(c=>c.id===id),salvar:(id,d,ativo=true)=>{let c=(db.cadastros||[]).find(x=>x.id===id);if(!c){c={id:id||`${tipo}-${uid()}`,tipo,dados:{},ativo:true};db.cadastros.push(c)}c.dados={...c.dados,...d};c.ativo=ativo;return c.id},excluir:id=>{db.cadastros=db.cadastros.filter(c=>c.id!==id)}});
 const CADS={
  fornecedores:{ic:'users',titulo:'Fornecedores',um:'fornecedor',sub:'Cadastro de fornecedores com dados fiscais, bancários e condições padrão de pagamento.',store:generico('forn'),nome:d=>d.fantasia||d.razao,
-  secoes:[['Identificação',[['razao','Razão social',{req:1,span:2}],['fantasia','Nome fantasia',{span:2}],['doc','CNPJ / CPF'],['ie','Inscrição estadual'],['tipoPessoa','Pessoa',{op:['Jurídica','Física']}],['desde','Fornecedor desde',{t:'date'}]]],
+  secoes:[['Identificação',[['doc','CNPJ / CPF',{req:1,ph:'Digite o CNPJ ou CPF — os dados são buscados na Receita'}],['tipoPessoa','Pessoa',{op:['Jurídica','Física']}],['ie','Inscrição estadual'],['desde','Fornecedor desde',{t:'date'}],['razao','Razão social / nome',{req:1,span:2}],['fantasia','Nome fantasia',{span:2}]]],
    ['Endereço e contato',[['cep','CEP'],['endereco','Endereço',{span:2}],['numero','Número'],['complemento','Complemento'],['bairro','Bairro'],['cidade','Cidade'],['uf','UF',{op:UF}],['contato','Contato'],['email','E-mail',{t:'email'}],['telefone','Telefone'],['telefone2','Telefone 2']]],
    ['Dados da Receita Federal',[['situacao','Situação cadastral'],['regime','Regime tributário'],['porte','Porte'],['abertura','Data de abertura',{t:'date'}],['natureza','Natureza jurídica',{span:2}],['capital','Capital social (R$)',{t:'money'}],['suframa','SUFRAMA'],['atividade','Atividade principal (CNAE)',{span:4}],['secundarias','Atividades secundárias',{t:'textarea',span:4}],['socios','Quadro societário',{t:'textarea',span:4}],['receitaEm','Consultado na Receita em',{t:'date'}]]],
    ['Condições financeiras',[['categoria','Categoria padrão',{op:()=>['',...catNomes()]}],['centro','Centro de custo padrão',{op:()=>['',...ccNomes()]}],['forma','Forma de pagamento',{op:['',...FORMAS]}],['prazo','Prazo padrão (dias)',{t:'number'}]]],
@@ -172,7 +179,7 @@ function campoHTML([k,l,o={}],d){const v=d[k]??'',id='cf_'+k,span=o.span?` style
  const ops=typeof o.op==='function'?o.op():o.op;
  if(ops)return `<div class="field"${span}><label for="${id}">${l}${req}</label><select id="${id}" data-cf="${k}">${ops.map(x=>{const [val,lab]=Array.isArray(x)?x:[x,x||'—'];return `<option value="${esc(val)}" ${String(v)===String(val)?'selected':''}>${esc(lab)}</option>`}).join('')}</select></div>`;
  if(o.t==='textarea')return `<div class="field"${span}><label for="${id}">${l}</label><textarea id="${id}" data-cf="${k}">${esc(v)}</textarea></div>`;
- return `<div class="field"${span}><label for="${id}">${l}${req}</label><input id="${id}" data-cf="${k}" type="${o.t==='money'?'text':o.t||'text'}" ${o.t==='money'?'inputmode="decimal"':''} value="${esc(o.t==='money'?String(v===''?'':Number(v).toFixed(2)).replace('.',','):v)}" ${o.fixo&&v?'readonly':''}></div>`}
+ return `<div class="field"${span}><label for="${id}">${l}${req}</label><input id="${id}" data-cf="${k}" type="${o.t==='money'?'text':o.t||'text'}" ${o.t==='money'?'inputmode="decimal"':''} value="${esc(o.t==='money'?String(v===''?'':Number(v).toFixed(2)).replace('.',','):v)}" ${o.fixo&&v?'readonly':''} ${o.ph?`placeholder="${esc(o.ph)}"`:''}></div>`}
 function lerCampos(def){const d={};for(const [,itens] of def.secoes)for(const [k,,o={}] of itens){const el=$(`[data-cf="${k}"]`);if(!el)continue;d[k]=o.t==='money'?round(TableImport.num(el.value)):o.t==='number'?(el.value===''?'':Number(el.value)):el.value.trim()}return d}
 function cadView(pg){const def=CADS[pg],u=cadUI(pg);
  if(u.modo==='ficha'){const c=u.id?def.store.get(u.id):null,d=c?.dados||{};const novo=!c;
@@ -187,7 +194,8 @@ function cadView(pg){const def=CADS[pg],u=cadUI(pg);
  <div class="tablebox"><div class="tablewrap"><table class="gridtable"><thead><tr>${def.colunas.map(([t])=>`<th>${t}</th>`).join('')}<th style="width:60px"></th></tr></thead><tbody>${l.map(c=>`<tr class="clk ${c.ativo===false?'inativo':''}" data-cad-ficha="${pg}:${esc(c.id)}">${def.colunas.map(([,f])=>`<td>${f(c.dados,c)}</td>`).join('')}<td class="num">${ico('chev',16)}</td></tr>`).join('')||`<tr><td colspan="${def.colunas.length+1}" class="empty">Nenhum registro. ${def.vazio||''}</td></tr>`}</tbody></table></div><div class="tablefoot">${l.length} registro(s)</div></div>`}
 function fornSemCadastro(){const cad=C('forn').map(c=>acharForn(c.dados));const vistos=new Map();for(const x of [...(db.purchases||[]).filter(n=>n.tipo==='compra').map(n=>({fornecedor:n.fornecedor,fornecedorDoc:n.fornecedorDoc})),...P().filter(t=>t.origem!=='extrato').map(t=>({fornecedor:t.fornecedor,fornecedorDoc:t.fornecedorDoc}))]){if(!x.fornecedor||cad.some(m=>m(x)))continue;const k=nomeNorm(x.fornecedor);if(!vistos.has(k)||(!vistos.get(k).fornecedorDoc&&x.fornecedorDoc))vistos.set(k,x)}return [...vistos.values()]}
 for(const [pg,def] of Object.entries(CADS))addPage(pg,def.ic,def.titulo,()=>cadView(pg),def.sub,'',()=>{const b=$('#cadBusca');if(b)b.oninput=e=>{cadUI(pg).busca=e.target.value;const pos=e.target.selectionStart;render();const n=$('#cadBusca');n.focus();n.setSelectionRange(pos,pos)}});
-function salvarCad(pg,depois){const def=CADS[pg],u=cadUI(pg),d=lerCampos(def);for(const [,itens] of def.secoes)for(const [k,l,o={}] of itens)if(o.req&&!String(d[k]??'').trim())return toast(`Preencha: ${l}.`);
+function salvarCad(pg,depois){const def=CADS[pg],u=cadUI(pg),d=lerCampos(def);
+ if(pg==='fornecedores'){const v=docValido(d.doc);if(!v)return toast('CNPJ / CPF inválido: confira os dígitos.');d.doc=v.fmt;d.tipoPessoa=v.tipo==='cpf'?'Física':'Jurídica';const dup=C('forn').find(c=>c.id!==u.id&&String(c.dados.doc||'').replace(/\D/g,'')===v.num);if(dup)return toast(`Já existe um fornecedor com este documento: ${dup.dados.fantasia||dup.dados.razao}.`)}for(const [,itens] of def.secoes)for(const [k,l,o={}] of itens)if(o.req&&!String(d[k]??'').trim())return toast(`Preencha: ${l}.`);
  const atual=u.id?def.store.get(u.id):null;const id=def.store.salvar(u.id,d,atual?atual.ativo!==false:true);if(!id)return;audit(`${def.titulo}: ${u.id?'ficha alterada':'cadastro incluído'}`,def.nome({...d})||id);
  if(depois==='novo'){u.id=null;u.modo='ficha'}else{u.id=id;u.modo='ficha'}render();toast('Cadastro salvo.')}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-cad-novo],[data-cad-salvar],[data-cad-salvarnovo],[data-cad-lista],[data-cad-ficha],[data-cad-excluir],[data-cad-ativo],[data-cad-exportar],[data-erp-plano],[data-erp-cc],[data-erp-importforn],[data-erp-print]');if(!b)return;const d=b.dataset;
@@ -296,3 +304,19 @@ window.ERP={busca,projecao,cadUI};
   if(!confirm(`Consultar ${alvo.length} fornecedor(es) na Receita pelo CNPJá? Cada consulta usa créditos do seu plano.`))return;b.disabled=true;let ok=0,erro=0;
   for(const c of alvo){try{toast(`Consultando ${ok+erro+1} de ${alvo.length}: ${c.dados.razao}`);const r=await consulta(c.dados.doc);const novo={...c.dados};for(const [k,v] of Object.entries(r))if(v!==''&&v!=null&&(k==='receitaEm'||!novo[k]||['situacao','regime','porte','natureza','capital','atividade','secundarias','socios','suframa','abertura','ie'].includes(k)))novo[k]=v;c.dados=novo;ok++}catch(err){erro++;console.warn(c.dados.razao,err.message)}}
   audit('Fornecedores completados pela Receita (CNPJá)',`${ok} atualizado(s)${erro?` · ${erro} com erro`:''}`);b.disabled=false;render();toast(`${ok} fornecedor(es) atualizado(s) pela Receita.${erro?` ${erro} com erro.`:''}`)})})();
+
+// ── CNPJ/CPF: máscara, validação e busca automática na Receita ao terminar de digitar ──
+function docValido(doc){const n=String(doc||'').replace(/\D/g,'');const dv=(b,p)=>{const s=b.split('').reduce((a,c,i)=>a+Number(c)*p[i],0)%11;return s<2?0:11-s};
+ if(n.length===11&&!/^(\d)\1+$/.test(n)){const p1=[10,9,8,7,6,5,4,3,2],p2=[11,...p1];if(dv(n.slice(0,9),p1)==n[9]&&dv(n.slice(0,10),p2)==n[10])return {tipo:'cpf',num:n,fmt:n.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/,'$1.$2.$3-$4')}}
+ if(n.length===14&&!/^(\d)\1+$/.test(n)){const p1=[5,4,3,2,9,8,7,6,5,4,3,2],p2=[6,...p1];if(dv(n.slice(0,12),p1)==n[12]&&dv(n.slice(0,13),p2)==n[13])return {tipo:'cnpj',num:n,fmt:n.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,'$1.$2.$3/$4-$5')}}
+ return null}
+let ultimoDoc='';
+document.addEventListener('input',e=>{const el=e.target.closest('[data-cf="doc"]');if(!el||page!=='fornecedores')return;const n=el.value.replace(/\D/g,'').slice(0,14);
+ el.value=n.length<=11?n.replace(/^(\d{3})(\d)/,'$1.$2').replace(/^(\d{3}\.\d{3})(\d)/,'$1.$2').replace(/^(\d{3}\.\d{3}\.\d{3})(\d)/,'$1-$2'):n.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})/,'$1.$2.$3/$4-$5');
+ el.classList.remove('invalid');if(n.length===14||n.length===11)setTimeout(()=>el.dispatchEvent(new Event('change',{bubbles:true})),0)});
+document.addEventListener('change',async e=>{const el=e.target.closest('[data-cf="doc"]');if(!el||page!=='fornecedores')return;const v=docValido(el.value);const n=el.value.replace(/\D/g,'');
+ if(!n)return;if(!v){el.classList.add('invalid');return toast(n.length===11||n.length===14?'Documento inválido: confira os dígitos.':'Digite o CNPJ (14 dígitos) ou o CPF (11 dígitos).')}
+ el.value=v.fmt;const tp=$('[data-cf="tipoPessoa"]');if(tp)tp.value=v.tipo==='cpf'?'Física':'Jurídica';
+ const u=ERP.cadUI('fornecedores'),dup=(db.cadastros||[]).filter(c=>c.tipo==='forn').find(c=>c.id!==u.id&&String(c.dados.doc||'').replace(/\D/g,'')===v.num);if(dup){el.classList.add('invalid');return toast(`Já cadastrado: ${dup.dados.fantasia||dup.dados.razao}. Abra a ficha existente em vez de criar outra.`)}
+ if(v.tipo==='cpf'){toast('CPF válido. Preencha o nome da pessoa física (a Receita não disponibiliza consulta aberta por CPF).');$('[data-cf="razao"]')?.focus();return}
+ if(ultimoDoc===v.num)return;ultimoDoc=v.num;const btn=$('[data-cnpj-buscar]');if(btn)btn.click()});
