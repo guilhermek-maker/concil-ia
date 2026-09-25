@@ -250,3 +250,7 @@ body.light .erp .rail{background:#1b2035}
 @media(max-width:760px){.erp{grid-template-columns:1fr}.erp .side{width:292px}}
 
 .logotile img{object-fit:contain;transform:none;padding:3px}
+
+/* Listas suspensas nativas seguem o tema */
+select{color-scheme:dark}select option,select optgroup{background:var(--panel);color:var(--text)}select option:checked{background:#a88aff33}
+body.light select{color-scheme:light}
