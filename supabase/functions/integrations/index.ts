@@ -83,10 +83,13 @@ Deno.serve(handler(async (req) => {
     if (!Deno.env.get("CRON_SECRET") || req.headers.get("x-cron-secret") !== Deno.env.get("CRON_SECRET")) throw new HttpError(401, "não autorizado");
     const db = admin();
     const deadline = Date.now() + BUDGET_MS;
-    const { data } = await db.from("integrations").select("workspace_id,provider,settings,last_sync").in("status", ["conectado", "erro"]);
+    const { data } = await db.from("integrations").select("workspace_id,provider,settings,last_sync,updated_at").in("status", ["conectado", "erro"]);
+    // Quem foi atendido há mais tempo vai primeiro, e o tempo da rodada é dividido entre as integrações.
+    const list = (data ?? []).sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)));
     const report = [];
-    for (const i of data ?? []) {
+    for (const [n, i] of list.entries()) {
       if (Date.now() > deadline - 15_000) break;
+      const slot = Math.min(deadline, Date.now() + (deadline - Date.now()) / (list.length - n));
       try {
         if (!i.settings?.job) {
           // Fila de períodos (ex.: histórico desde abril): um por vez, antes da sincronização de hora em hora.
@@ -101,7 +104,7 @@ Deno.serve(handler(async (req) => {
             await startJob(db, i.workspace_id, i.provider, iso(new Date(Date.now() - 7 * 86400_000)), iso(new Date()));
           }
         }
-        report.push({ ...i, settings: undefined, ...(await advanceJob(db, i.workspace_id, i.provider, deadline)) });
+        report.push({ workspace_id: i.workspace_id, provider: i.provider, ...(await advanceJob(db, i.workspace_id, i.provider, slot)) });
       } catch (e) { report.push({ workspace_id: i.workspace_id, provider: i.provider, error: String(e) }); }
     }
     return json({ report });
