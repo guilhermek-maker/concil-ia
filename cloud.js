@@ -119,7 +119,7 @@ Cloud.paintStatus=paintStatus;
 // ───────── Tela de acesso ─────────
 function loginView(msg=''){window.Assistant?.sync();
  $('#app').innerHTML=`<div class="auth"><div class="authcard"><div class="complogo login"><img src="brand/comprastore.png" alt="Compra Store"></div><div class="brand" style="padding:0;margin-bottom:26px"><span class="mark">${icon('marca')}</span><div>EcomBalance<small>CONCILIAÇÃO E RESULTADO</small></div></div>
- <h1 style="font-size:24px">Entre na sua operação</h1><p>Seus dados ficam protegidos na nuvem e sincronizam entre computadores.</p>
+ <h1 style="font-size:24px">Entre na sua operação</h1><p>Seus dados ficam protegidos na nuvem e sincronizam entre computadores. Primeiro acesso? Informe e-mail e senha e clique em <strong>Criar conta</strong>: o administrador recebe o pedido e libera.</p>
  <form id="authForm" autocomplete="on"><label for="authEmail">E-mail</label><input id="authEmail" type="email" required autocomplete="email" style="width:100%">
  <label for="authPass">Senha</label><input id="authPass" type="password" minlength="8" autocomplete="current-password" style="width:100%" placeholder="Mínimo de 8 caracteres">
  <div class="row wrap" style="margin-top:18px"><button class="primary" type="submit" data-auth="login">Entrar</button><button type="submit" data-auth="signup">Criar conta</button><button type="submit" class="quiet small" data-auth="magic">Receber link por e-mail</button></div></form>
@@ -132,9 +132,17 @@ function loginView(msg=''){window.Assistant?.sync();
    else{if(password.length<8)throw Error('Informe uma senha com pelo menos 8 caracteres.');r=mode==='signup'?await sb.auth.signUp({email,password,options:{emailRedirectTo:redirect}}):await sb.auth.signInWithPassword({email,password})}
    if(r.error)throw r.error;
    if(mode==='magic')out.textContent='Enviamos um link de acesso para '+email+'.';
-   else if(mode==='signup'&&!r.data.session)out.textContent='Conta criada. Confirme pelo link enviado ao seu e-mail e depois entre.';
+   else if(mode==='signup'&&!r.data.session)out.textContent='Conta criada. Confirme pelo link enviado ao seu e-mail e entre: seu pedido de acesso vai para o administrador liberar.';
   }catch(err){out.textContent=({'Invalid login credentials':'E-mail ou senha incorretos.','Signups not allowed for this instance':'Novos cadastros estão fechados. Peça ao dono do workspace para liberar seu acesso.','Signups not allowed for otp':'Novos cadastros estão fechados. Use um e-mail que já tenha conta.'})[err.message]||err.message}};
 }
+
+// Quem criou a conta e ainda não foi liberado pelo administrador.
+async function aguardandoView(session){const {data:req}=await sb.from('access_requests').select('status,created_at,decided_at').eq('user_id',session.user.id).order('created_at',{ascending:false}).limit(1);const r=req?.[0];const recusado=r?.status==='recusado';
+ $('#app').innerHTML=`<div class="auth"><div class="authcard"><div class="brand" style="padding:0;margin-bottom:22px"><span class="mark">${icon('marca')}</span><div>EcomBalance<small>CONCILIAÇÃO E RESULTADO</small></div></div>
+ <h1 style="font-size:23px">${recusado?'Acesso não liberado':'Aguardando liberação'}</h1><p>${recusado?'O administrador não liberou o acesso para':'Sua conta foi criada e o pedido de acesso foi enviado ao administrador.'} <strong>${esc(session.user.email)}</strong>${recusado?'. Se foi engano, fale com ele.':'. Assim que ele liberar, é só entrar de novo (ou clicar em Verificar).'}</p>
+ ${r&&!recusado?`<p class="caption" style="margin-top:10px">Pedido feito em ${new Date(r.created_at).toLocaleString('pt-BR')}.</p>`:''}
+ <div class="row wrap" style="margin-top:20px">${recusado?'':'<button class="primary" id="accCheck">Verificar agora</button>'}<button class="quiet" id="accOut">Sair</button></div></div></div>`;
+ const c=$('#accCheck');if(c)c.onclick=()=>start(session);$('#accOut').onclick=async()=>{await sb.auth.signOut()}}
 
 async function start(session){
  Cloud.session=session;
@@ -144,6 +152,7 @@ async function start(session){
   const {data:ws,error}=await sb.rpc('ensure_workspace');if(error)throw error;
   // Quem foi adicionado a uma equipe abre o workspace da equipe; a escolha fica lembrada neste navegador.
   const {data:mems,error:me}=await sb.from('workspace_members').select('workspace_id,role,created_at,workspaces(name)').eq('user_id',session.user.id).order('created_at');if(me)throw me;
+  if(!(mems||[]).length){await aguardandoView(session);return}
   Cloud.workspaces=(mems||[]).map(m=>({id:m.workspace_id,role:m.role,name:m.workspaces?.name||'Minha operação'}));
   let pref=null;try{pref=localStorage.getItem('concilia-ws')}catch{}
   const chosen=Cloud.workspaces.find(w=>w.id===pref)||Cloud.workspaces.find(w=>w.role==='member')||Cloud.workspaces.find(w=>w.id===ws)||{id:ws,role:'owner',name:'Minha operação'};
