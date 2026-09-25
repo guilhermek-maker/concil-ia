@@ -235,8 +235,8 @@ addPage('precos','tag','Tabela e Simulador',precosView,'Custos, regras de cada c
 function bindGestao(){const s=$('#gSearch');if(s)s.oninput=e=>{ui.search=e.target.value;const pos=e.target.selectionStart;render();const a=$('#gSearch');a.focus();try{a.setSelectionRange(pos,pos)}catch{}};
  const mf=$('#gMapFilter');if(mf)mf.onchange=e=>{ui.mapFilter=e.target.value;render()};
  $$('[data-g-map]').forEach(x=>x.onchange=()=>{db.accMap[x.dataset.gMap]={linha:x.value,descricao:x.dataset.desc};save();if(ui.mapFilter==='pendentes')render()});
- $('[data-g-exc]').forEach(x=>x.onchange=()=>{G().excluir[x.dataset.gExc]=x.checked;audit('Visão gerencial',(x.checked?'Excluída':'Incluída de volta')+' a conta '+x.dataset.gExc);render()});
- $('[data-g-attach]').forEach(x=>x.onchange=e=>attach(x.dataset.gAttach,e.target.files[0]));
+ $$('[data-g-exc]').forEach(x=>x.onchange=()=>{G().excluir[x.dataset.gExc]=x.checked;audit('Visão gerencial',(x.checked?'Excluída':'Incluída de volta')+' a conta '+x.dataset.gExc);render()});
+ $$('[data-g-attach]').forEach(x=>x.onchange=e=>attach(x.dataset.gAttach,e.target.files[0]));
  $$('[data-g-rule]').forEach(x=>x.onchange=()=>{setPath(db.pricing,x.dataset.gRule,x.type==='checkbox'?x.checked:n2(x.value));save()});
  $$('[data-s]').forEach(x=>x.oninput=()=>onSim(x));
  const sk=$('#sSku');if(sk)sk.onchange=e=>{sim.sku=e.target.value;sim.preco=0;sim.over={};render()};
