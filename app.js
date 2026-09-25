@@ -41,7 +41,8 @@ function navigate(p){page=p;filter='';statusFilter='';platformFilter='';document
 const navItems=[['dashboard','grid','Visão geral'],['reconcile','link','Central de conciliação'],['imports','upload','Importar relatórios'],['ai','spark','Assistente IA'],['pending','alert','Pendências'],['closing','shield','Fechamento do mês'],['reports','file','Relatórios'],['history','clock','Histórico e auditoria']];
 const MODULOS=[
  {id:'conc',ic:'link',t:'Conciliação',sub:'Plataformas × ERP',itens:[['Rotina',['reconcile','pending','closing']],['Dados',['integracoes','imports']]],plataformas:true},
- {id:'res',ic:'book',t:'Resultado',sub:'DRE, contabilidade e caixa',itens:[['Resultado',['contabil','fluxo','reports']],['Vendas',['produtos','estados','clientes']]]},
+ {id:'fin',ic:'wallet',t:'Financeiro',sub:'Contas a pagar e caixa',itens:[['Pagar',['pagar','compras']],['Caixa',['fluxo']]]},
+ {id:'res',ic:'book',t:'Resultado',sub:'DRE e contabilidade',itens:[['Resultado',['contabil','reports']],['Vendas',['produtos','estados','clientes']]]},
  {id:'prec',ic:'tag',t:'Preços',sub:'Tabela e simulador',itens:[['Preços',['precos']]]}];
 const NAVFIXO=['dashboard','equipe','ai','history'];
 let moduloAtual=(()=>{try{return localStorage.getItem('ecombalance_mod')||'conc'}catch{return 'conc'}})();

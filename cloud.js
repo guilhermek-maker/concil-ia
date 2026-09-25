@@ -38,11 +38,14 @@ const maps={
  scenarios:{table:'pricing_scenarios',key:'id',
   toRow:s=>({id:s.id,nome:s.nome,data:s.data,time:s.time}),
   fromRow:r=>({id:r.id,nome:r.nome,data:r.data,time:r.time})},
+ payables:{table:'payables',key:'id',
+  toRow:t=>({id:t.id,origem:t.origem||'manual',invoice_id:t.invoiceId||null,fornecedor:t.fornecedor||null,fornecedor_doc:t.fornecedorDoc||null,descricao:t.descricao||null,documento:t.documento||null,parcela:t.parcela??null,parcelas:t.parcelas??null,emissao:t.emissao||null,vencimento:t.vencimento,valor:t.valor,juros:t.juros||0,desconto:t.desconto||0,valor_pago:t.valorPago||0,pago_em:t.pagoEm||null,status:t.status||'aberto',categoria:t.categoria||null,centro_custo:t.centroCusto||null,conta:t.conta||null,observacao:t.observacao||null,anexos:t.anexos||null,created_by:t.createdBy||null}),
+  fromRow:r=>({id:r.id,origem:r.origem,invoiceId:r.invoice_id||null,fornecedor:r.fornecedor||'',fornecedorDoc:r.fornecedor_doc||'',descricao:r.descricao||'',documento:r.documento||'',parcela:r.parcela,parcelas:r.parcelas,emissao:r.emissao||'',vencimento:r.vencimento,valor:n(r.valor),juros:n(r.juros),desconto:n(r.desconto),valorPago:n(r.valor_pago),pagoEm:r.pago_em||null,status:r.status,categoria:r.categoria||'',centroCusto:r.centro_custo||'',conta:r.conta||'',observacao:r.observacao||'',anexos:r.anexos||null,createdBy:r.created_by||''})},
  audit:{table:'audit_log',key:'id',insertOnly:true,
   toRow:a=>({id:a.id,time:a.time,action:a.action,detail:a.detail||'',actor:a.actor||Cloud.session?.user?.email||null}),
   fromRow:r=>({id:r.id,time:r.time,action:r.action,detail:r.detail,actor:r.actor})},
 };
-const listOf={orders:()=>db.orders,receipts:()=>db.receipts,ledger:()=>db.ledger,imports:()=>db.imports,audit:()=>db.audit,accLines:()=>db.accLines||[],accDocs:()=>db.accDocs||[],products:()=>db.products||[],scenarios:()=>db.scenarios||[]};
+const listOf={orders:()=>db.orders,receipts:()=>db.receipts,ledger:()=>db.ledger,imports:()=>db.imports,audit:()=>db.audit,accLines:()=>db.accLines||[],accDocs:()=>db.accDocs||[],products:()=>db.products||[],scenarios:()=>db.scenarios||[],payables:()=>db.payables||[]};
 let snap={};           // último estado gravado: coleção → Map(id → JSON)
 let flushTimer=null,flushing=null,dirty=false;
 
@@ -51,17 +54,19 @@ function snapshot(){ensureIds();snap={};for(const [k,m] of Object.entries(maps))
  snap.crm=new Map(Object.entries(db.crm||{}).map(([id,c])=>[id,JSON.stringify(c)]));snap.accMap=new Map(Object.entries(db.accMap||{}).map(([id,c])=>[id,JSON.stringify(c)]));snap.closures=new Map(Object.entries(db.closures||{}).map(([m,c])=>[m,JSON.stringify(c)]));snap.settings=JSON.stringify(settingsOf())}
 function settingsOf(){return {theme:db.theme,pricing:db.pricing||null,gerencial:db.gerencial||null}}
 
-async function pageAll(table){let out=[],from=0;for(;;){const {data,error}=await sb.from(table).select('*').eq('workspace_id',Cloud.ws).range(from,from+999);if(error)throw error;out.push(...data);if(data.length<1000)return out;from+=1000}}
+async function pageAll(table,cols='*'){let out=[],from=0;for(;;){const {data,error}=await sb.from(table).select(cols).eq('workspace_id',Cloud.ws).range(from,from+999);if(error)throw error;out.push(...data);if(data.length<1000)return out;from+=1000}}
 
 async function load(){
  Cloud.state='loading';
- const [orders,receipts,ledger,imports,audit,crm,closures,settings,accLines,accMap,accDocs,products,scenarios]=await Promise.all(['orders','receipts','ledger','imports','audit_log','crm_contacts','closures','workspace_settings','accounting_lines','account_map','accounting_docs','pricing_products','pricing_scenarios'].map(pageAll));
+ const [orders,receipts,ledger,imports,audit,crm,closures,settings,accLines,accMap,accDocs,products,scenarios]=await Promise.all(['orders','receipts','ledger','imports','audit_log','crm_contacts','closures','workspace_settings','accounting_lines','account_map','accounting_docs','pricing_products','pricing_scenarios'].map(t=>pageAll(t)));
  const next={orders:orders.map(maps.orders.fromRow),receipts:receipts.map(maps.receipts.fromRow),ledger:ledger.map(maps.ledger.fromRow),
   imports:imports.map(maps.imports.fromRow).sort((a,b)=>b.time.localeCompare(a.time)),audit:audit.map(maps.audit.fromRow).sort((a,b)=>b.time.localeCompare(a.time)),
   crm:Object.fromEntries(crm.map(c=>[c.id,{stage:c.stage,tags:c.tags||[],notes:c.notes||'',interactions:c.interactions||[]}])),
   closures:Object.fromEntries(closures.map(c=>[c.month,c.data])),theme:settings[0]?.data?.theme||db.theme||'dark',schemaVersion:2,
   accLines:accLines.map(maps.accLines.fromRow),accMap:Object.fromEntries(accMap.map(a=>[a.conta,{linha:a.linha,descricao:a.descricao||''}])),accDocs:accDocs.map(maps.accDocs.fromRow),
-  products:products.map(maps.products.fromRow),scenarios:scenarios.map(maps.scenarios.fromRow),pricing:settings[0]?.data?.pricing||undefined,gerencial:settings[0]?.data?.gerencial||undefined};
+  products:products.map(maps.products.fromRow),scenarios:scenarios.map(maps.scenarios.fromRow),payables:(await pageAll('payables')).map(maps.payables.fromRow),
+  // Notas de entrada: só leitura (a origem é o Bling), sem o JSON bruto.
+  purchases:(await pageAll('purchase_invoices','id,numero,serie,chave,emissao,fornecedor,fornecedor_doc,valor,cfop,natureza,tipo,situacao,itens,parcelas')).map(r=>({id:r.id,numero:r.numero,serie:r.serie,chave:r.chave,emissao:r.emissao,fornecedor:r.fornecedor,fornecedorDoc:r.fornecedor_doc,valor:n(r.valor),cfop:r.cfop,natureza:r.natureza,tipo:r.tipo,situacao:r.situacao,itens:r.itens||[],parcelas:r.parcelas||[]})),pricing:settings[0]?.data?.pricing||undefined,gerencial:settings[0]?.data?.gerencial||undefined};
  db=next;paymentIndex=null;snapshot();Cloud.state='saved';
  document.body.classList.toggle('light',db.theme==='light');
  const months=[...new Set(db.orders.map(o=>o.date.slice(0,7)))].sort();
@@ -118,7 +123,7 @@ Cloud.paintStatus=paintStatus;
 
 // ───────── Tela de acesso ─────────
 function loginView(msg=''){window.Assistant?.sync();
- $('#app').innerHTML=`<div class="auth"><div class="authcard"><div class="complogo login"><img src="brand/comprastore.png" alt="Compra Store"></div><div class="brand" style="padding:0;margin-bottom:26px"><span class="mark">${icon('marca')}</span><div>EcomBalance<small>CONCILIAÇÃO E RESULTADO</small></div></div>
+ $('#app').innerHTML=`<div class="auth"><div class="authcard"><div class="complogo login"><img src="brand/comprastore-transparente.png" alt="Compra Store"></div><div class="brand" style="padding:0;margin-bottom:26px"><span class="mark">${icon('marca')}</span><div>EcomBalance<small>CONCILIAÇÃO E RESULTADO</small></div></div>
  <h1 style="font-size:24px">Entre na sua operação</h1><p>Seus dados ficam protegidos na nuvem e sincronizam entre computadores. Primeiro acesso? Informe e-mail e senha e clique em <strong>Criar conta</strong>: o administrador recebe o pedido e libera.</p>
  <form id="authForm" autocomplete="on"><label for="authEmail">E-mail</label><input id="authEmail" type="email" required autocomplete="email" style="width:100%">
  <label for="authPass">Senha</label><input id="authPass" type="password" minlength="8" autocomplete="current-password" style="width:100%" placeholder="Mínimo de 8 caracteres">
