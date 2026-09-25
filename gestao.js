@@ -230,8 +230,8 @@ function exportCsv(name,rows){download(`${name}.csv`,csv(rows));toast('Arquivo C
 function setPath(obj,path,val){const k=path.split('.');let o=obj;while(k.length>1){const x=k.shift();o=o[x]=o[x]||{}}o[k[0]]=val}
 
 // ═════════════════════════ Registro das páginas e eventos ═════════════════════════
-addPage('contabil','book','Contabilidade e Resultado',contabilView,'Razão, balancete e PDFs do escritório viram a DRE gerencial do e-commerce.','produtos',bindGestao);
-addPage('precos','tag','Preços e Simulador',precosView,'Custos, regras de cada canal e margem de cada produto — e um simulador para testar.','produtos',bindGestao);
+addPage('contabil','book','DRE e Contabilidade',contabilView,'Razão, balancete e PDFs do escritório viram a DRE gerencial do e-commerce.','produtos',bindGestao);
+addPage('precos','tag','Tabela e Simulador',precosView,'Custos, regras de cada canal e margem de cada produto — e um simulador para testar.','produtos',bindGestao);
 function bindGestao(){const s=$('#gSearch');if(s)s.oninput=e=>{ui.search=e.target.value;const pos=e.target.selectionStart;render();const a=$('#gSearch');a.focus();try{a.setSelectionRange(pos,pos)}catch{}};
  const mf=$('#gMapFilter');if(mf)mf.onchange=e=>{ui.mapFilter=e.target.value;render()};
  $$('[data-g-map]').forEach(x=>x.onchange=()=>{db.accMap[x.dataset.gMap]={linha:x.value,descricao:x.dataset.desc};save();if(ui.mapFilter==='pendentes')render()});
