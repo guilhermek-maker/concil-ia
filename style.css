@@ -112,3 +112,5 @@ table.dre tr.conta td:first-child{padding-left:30px}
 .cascata text.neg{fill:var(--red)}
 
 .modswitch{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:14px 0 4px;padding:4px;border:1px solid var(--line);border-radius:11px;background:var(--panel2)}.modswitch button{flex-direction:column;gap:3px;padding:8px 2px;border:0;background:transparent;color:var(--muted);font-size:10.5px;border-radius:8px}.modswitch button .icon{width:16px;height:16px}.modswitch button:hover{transform:none;color:var(--text)}.modswitch button.active{background:#a88aff22;color:var(--accent);font-weight:650}.modtitle{margin:16px 13px 0;font-size:15px;font-weight:650}.modtitle small{display:block;font-size:10.5px;font-weight:400;color:var(--muted)}aside .navlabel{margin:16px 13px 5px}aside nav button{padding:9px 13px}.platnav button{padding:7px 13px;font-size:12px}
+
+.equipebtn{gap:6px}@media(max-width:850px){.equipebtn span:not(.navbadge){display:none}}
