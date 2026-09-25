@@ -6,4 +6,4 @@ git diff --quiet -- web || { echo "Há alterações não commitadas em web/. Fa�
 git branch -D gh-pages >/dev/null 2>&1 || true
 git subtree split --prefix web -b gh-pages
 git push -f origin gh-pages
-echo "Publicado. O GitHub Pages atualiza em 1–2 minutos: https://guilhermek-maker.github.io/concil-ia/"
+echo "Publicado. O GitHub Pages atualiza em 1–2 minutos: https://guilhermek-maker.github.io/fechai/"

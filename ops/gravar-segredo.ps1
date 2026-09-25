@@ -26,7 +26,7 @@ if ($LASTEXITCODE -ne 0) { Write-Host 'Falha ao gravar no Supabase. Avise o Clau
 Write-Host "OK: $Nome gravado no servidor ($($valor.Length) caracteres)."
 
 $gh = Get-Command gh -ErrorAction SilentlyContinue
-if ($gh) { $valor | gh secret set $Nome -R guilhermek-maker/concil-ia 2>$null; if ($LASTEXITCODE -eq 0) { Write-Host 'Cópia também guardada no GitHub.' } }
+if ($gh) { $valor | gh secret set $Nome -R guilhermek-maker/fechai 2>$null; if ($LASTEXITCODE -eq 0) { Write-Host 'Cópia também guardada no GitHub.' } }
 $valor = $null
 Set-Clipboard -Value " "
 Write-Host "Área de transferência limpa."
