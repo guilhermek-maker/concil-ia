@@ -13,7 +13,7 @@ verify_jwt = false
 verify_jwt = false
 
 [auth]
-site_url = "https://guilhermek-maker.github.io/fechai/"
+site_url = "https://guilhermek-maker.github.io/ecombalance/"
 # Cadastro fechado: só quem já tem conta entra. Para incluir alguém da equipe, mude para true, rode `supabase config push`, e volte para false depois.
 enable_signup = false
-additional_redirect_urls = ["https://guilhermek-maker.github.io/fechai/**", "https://guilhermek-maker.github.io/concil-ia/**", "http://127.0.0.1:3000/**"]
+additional_redirect_urls = ["https://guilhermek-maker.github.io/ecombalance/**", "https://guilhermek-maker.github.io/fechai/**", "https://guilhermek-maker.github.io/concil-ia/**", "http://127.0.0.1:3000/**"]
