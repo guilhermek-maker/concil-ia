@@ -58,7 +58,7 @@ function planilha(f){if(!A().length)return toast('Cadastre a conta bancária ant
 
 // ─────────────── Sugestões de conciliação ───────────────
 const palavras=s=>normalized(s).split(/[^a-z0-9]+/).filter(w=>w.length>=4&&!['ltda','comercio','industria','servicos','pagamento','pagto','boleto','enviado','recebido','transferencia','sispag','debito','credito','conta'].includes(w));
-const usado=()=>new Set(T().filter(t=>t.vinculo?.tipo==='payable').map(t=>t.vinculo.id));
+const usado=()=>new Set(T().filter(t=>t.vinculo?.tipo==='payable').flatMap(t=>t.vinculo.ids||[t.vinculo.id]));
 const REGRAS=[[/mercado\s?pago|mercadopago/,'transferencia','Mercado Pago'],[/shopee|airpay/,'transferencia','Shopee'],[/magalu|magazine luiza/,'transferencia','Magalu'],
  [/rend(imento)?|juros s\/ aplic|remuner/,'receita','Rendimentos de aplicações'],[/aplic|resgate|cdb|invest/,'aplicacao','Aplicação / resgate'],
  [/tarifa|\btar\b|cesta|pacote serv|manut conta|taxa/,'despesa','Tarifas bancárias'],[/\biof\b/,'despesa','Impostos e taxas'],[/darf|\bgps\b|\bdas\b|sefaz|icms|gnre|simples nac/,'despesa','Impostos e taxas'],[/folha|salario|pro.?labore/,'despesa','Salários e encargos']];
@@ -74,7 +74,7 @@ function conciliar(t,s){const a=A().find(c=>c.id===t.contaId);
  if(s.tipo==='payable'){const p=(db.payables||[]).find(x=>x.id===s.id);if(!p)return;if(p.status!=='pago'){p.valorPago=round((p.valorPago||0)+Math.abs(t.valor));p.pagoEm=t.data;p.conta=a?.nome||p.conta;const sd=round(p.valor+(p.juros||0)-(p.desconto||0)-p.valorPago);if(sd<-0.009){p.juros=round((p.juros||0)-sd)}p.status=Math.max(0,sd)<0.01?'pago':'parcial'}}
  if(s.tipo==='despesa'&&s.criar){const id='EXT-'+t.id;(db.payables||(db.payables=[])).push({id,origem:'extrato',fornecedor:s.fornecedor||t.descricao,descricao:t.descricao,documento:t.documento||'',vencimento:t.data,emissao:t.data,valor:Math.abs(t.valor),juros:0,desconto:0,valorPago:Math.abs(t.valor),pagoEm:t.data,conta:a?.nome||'',status:'pago',categoria:s.categoria||'Outras despesas',parcela:1,parcelas:1,createdBy:'Conciliação bancária'});s={...s,id}}
  t.status='conciliado';t.vinculo={tipo:s.tipo,id:s.id||null,desc:s.desc||'',categoria:s.categoria||null};t.categoria=s.categoria||t.categoria||''}
-function desfazer(t){if(t.vinculo?.tipo==='payable'){const p=(db.payables||[]).find(x=>x.id===t.vinculo.id);if(p&&p.pagoEm===t.data){p.valorPago=round(Math.max(0,(p.valorPago||0)-Math.abs(t.valor)));if(!p.valorPago){p.pagoEm=null}p.status=p.valorPago?'parcial':'aberto'}}
+function desfazer(t){if(t.vinculo?.tipo==='payable'){const ids=t.vinculo.ids||[t.vinculo.id];for(const id of ids){const p=(db.payables||[]).find(x=>x.id===id);if(!p||p.pagoEm!==t.data)continue;p.valorPago=ids.length>1?0:round(Math.max(0,(p.valorPago||0)-Math.abs(t.valor)));if(!p.valorPago){p.pagoEm=null}p.status=p.valorPago?'parcial':'aberto'}}
  if(t.vinculo?.tipo==='despesa'&&String(t.vinculo.id||'').startsWith('EXT-'))db.payables=(db.payables||[]).filter(p=>p.id!==t.vinculo.id);
  t.status='pendente';t.vinculo=null}
 
