@@ -1,0 +1,38 @@
+'use strict';
+// Central de pendências do ERP: tudo que precisa de alguém, agrupado por tipo de problema, com tamanho,
+// o mais antigo e a ação. Repasse "atrasado" usa o prazo real de cada canal (mediana do histórico) + 5 dias.
+(()=>{
+const ui={grupo:null,busca:''};
+const hoje=()=>new Date().toLocaleDateString('sv-SE');
+const somaDias=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.toLocaleDateString('sv-SE')};
+const dBR=d=>d?new Date(d+'T12:00:00').toLocaleDateString('pt-BR'):'—';
+const idade=d=>Math.max(0,Math.round((new Date(hoje()+'T12:00:00')-new Date(d+'T12:00:00'))/864e5));
+function grupos(){const h=hoje(),pz=window.Fluxo?.prazos?.()||{},lim=somaDias(h,-120);
+ const atras=db.orders.filter(o=>o.date>=lim&&status(o)==='A receber').map(o=>({o,prev:o.due||somaDias(o.date,(pz[o.platform]??15)+5)})).filter(x=>x.prev<h).map(x=>({id:x.o.id,d:x.o.date,v:round(net(x.o)-paid(x.o)),canal:x.o.platform,det:`previsto ${dBR(x.prev)}`,order:x.o.id}));
+ const div=db.orders.filter(o=>o.date>=lim&&status(o)==='Divergência').map(o=>({id:o.id,d:o.date,v:round(paid(o)-net(o)),canal:o.platform,det:`recebido ${money(paid(o))} × previsto ${money(net(o))}`,order:o.id}));
+ const soltas=(db.receipts||[]).filter(r=>!r.linkedOrder&&r.amount>0&&(r.date||'')>=lim).map(r=>({id:r.id,d:r.date,v:r.amount,canal:r.platform,det:r.description||r.kind||'liberação sem pedido'}));
+ const semNf=db.orders.filter(o=>!o.nf&&o.date>=somaDias(h,-30)&&idade(o.date)>=2).map(o=>({id:o.id,d:o.date,v:o.gross,canal:o.platform,det:(o.items||[]).map(i=>i.title||i.sku).join(' · ').slice(0,80),order:o.id}));
+ const extrato=(db.bankTx||[]).filter(t=>t.status==='pendente').map(t=>({id:t.id,d:t.data,v:t.valor,canal:'Banco',det:t.descricao}));
+ const vencidos=(db.payables||[]).filter(p=>!['pago','cancelado'].includes(p.status)&&p.vencimento<h).map(p=>({id:p.id,d:p.vencimento,v:round(Math.max(0,p.valor+(p.juros||0)-(p.desconto||0)-(p.valorPago||0))),canal:p.fornecedor||'—',det:p.descricao||p.documento||''}));
+ const atend=(window.Atendimento?.avisos?.()||[]).length;
+ return [
+  ['atrasados','bad','alert','Repasses atrasados','Pedidos que já deveriam ter sido pagos pelo marketplace (prazo real do canal + 5 dias).',atras,'Cobrar/abrir reclamação no marketplace','reconcile'],
+  ['divergencias','warn','alert','Divergências','Recebido diferente do líquido previsto: tarifa a mais, reembolso parcial, frete.',div,'Revisar na conciliação','reconcile'],
+  ['soltas','info','link','Liberações sem pedido','Dinheiro recebido que ainda não foi ligado a um pedido.',soltas,'Buscar correspondências','reconcile'],
+  ['semnf','warn','receipt','Pedidos sem nota','Pagos há 2 dias ou mais e ainda sem nota fiscal.',semNf,'Ver faturamento','faturamento'],
+  ['extrato','info','swap','Extrato a conciliar','Movimentos do banco ainda sem classificação.',extrato,'Conciliar extrato','concbanco'],
+  ['vencidos','bad','wallet','Títulos vencidos','Contas a pagar em atraso.',vencidos,'Abrir contas a pagar','pagar']].map(([k,tom,ic,t,s,l,acao,nav])=>({k,tom,ic,t,s,l:l.sort((a,b)=>String(a.d).localeCompare(String(b.d))),acao,nav,total:l.reduce((x,i)=>x+Math.abs(i.v||0),0)})).concat(atend?[{k:'atend',tom:'warn',ic:'headset',t:'Atendimento',s:'Reclamações, perguntas e mensagens aguardando a equipe.',l:[],acao:'Abrir atendimento',nav:'atendimento',total:0,n:window.Atendimento.abertos()}]:[])}
+function view(){const gs=grupos(),abertos=gs.filter(g=>g.l.length||g.n);const g=gs.find(x=>x.k===ui.grupo);
+ if(g){const q=normalized(ui.busca),l=g.l.filter(i=>!q||normalized([i.id,i.canal,i.det].join(' ')).includes(q));
+  return `<div class="row" style="margin-bottom:14px"><button class="small" data-pd-voltar="1">‹ Todas as pendências</button><button class="small primary" data-nav="${g.nav}">${g.acao}</button></div>
+  <div class="crmbar"><div class="searchin">${icon('search')}<input type="search" id="pdBusca" placeholder="Pedido, canal, descrição…" value="${esc(ui.busca)}"></div><button class="small" data-pd-csv="${g.k}">${icon('download')} Exportar</button></div>
+  <div class="tablebox"><div class="tabletop"><div><h2>${g.t}</h2><p class="caption">${g.s} ${l.length.toLocaleString('pt-BR')} item(ns) · ${money(l.reduce((x,i)=>x+Math.abs(i.v||0),0))}</p></div></div><div class="tablewrap"><table><thead><tr><th>Data</th><th>Há</th><th>Referência</th><th>Canal / origem</th><th>Detalhe</th><th class="num">Valor</th></tr></thead><tbody>
+  ${l.slice(0,500).map(i=>`<tr ${i.order?`class="clickrow" data-order="${esc(i.order)}"`:''}><td>${dBR(i.d)}</td><td><span class="badge ${idade(i.d)>30?'bad':idade(i.d)>7?'warn':''}">${idade(i.d)} d</span></td><td class="mono">${esc(String(i.id).slice(0,28))}</td><td>${esc(i.canal||'')}</td><td class="caption">${esc(i.det||'')}</td><td class="num ${i.v<0?'red':''}">${money(i.v)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nada aqui. ✓</td></tr>'}</tbody></table></div></div>`}
+ return `<div class="grid kpis4"><div class="card kpi"><span class="kpil">Tipos com pendência</span><span class="kpiv">${abertos.length}</span><span class="kpis">de ${gs.length} verificados</span></div><div class="card kpi"><span class="kpil">Itens no total</span><span class="kpiv">${gs.reduce((s,g)=>s+(g.n||g.l.length),0).toLocaleString('pt-BR')}</span><span class="kpis">somando vendas, banco e contas</span></div><div class="card kpi"><span class="kpil">Repasses atrasados</span><span class="kpiv ${gs[0].l.length?'red':''}">${money(gs[0].total)}</span><span class="kpis">${gs[0].l.length} pedido(s)</span></div><div class="card kpi"><span class="kpil">Liberações sem pedido</span><span class="kpiv">${money(gs[2].total)}</span><span class="kpis">${gs[2].l.length} liberação(ões)</span></div></div>
+ <div class="pdgrid">${gs.map(g=>{const n=g.n??g.l.length,mais=g.l[0];return `<button class="card pdcard ${n?'':'ok'}" ${g.l.length?`data-pd-grupo="${g.k}"`:`data-nav="${g.nav}"`}><div class="pdhead"><span class="avico ${n?g.tom:'ok'}">${icon(n?g.ic:'check')}</span><strong>${g.t}</strong><span class="pdn">${n.toLocaleString('pt-BR')}</span></div><p class="caption">${g.s}</p>${n?`<div class="pdfoot"><span>${g.total?money(g.total):''}</span><span class="caption">${mais?`mais antigo: ${dBR(mais.d)} (${idade(mais.d)} d)`:''}</span></div><span class="pdacao">${g.acao} ›</span>`:'<span class="green caption">Em dia ✓</span>'}</button>`}).join('')}</div>`}
+function csv(k){const g=grupos().find(x=>x.k===k);if(!g)return;const txt=[['data','referencia','canal','detalhe','valor'],...g.l.map(i=>[i.d,i.id,i.canal,i.det,String(i.v).replace('.',',')])].map(l=>l.map(x=>`"${String(x??'').replace(/"/g,'""')}"`).join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+txt],{type:'text/csv'}));a.download=`pendencias-${k}-${hoje()}.csv`;a.click()}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-pd-grupo],[data-pd-voltar],[data-pd-csv]');if(!b)return;const d=b.dataset;if(d.pdGrupo){ui.grupo=d.pdGrupo;ui.busca='';render()}if(d.pdVoltar){ui.grupo=null;render()}if(d.pdCsv)csv(d.pdCsv)});
+function bind(){const i=$('#pdBusca');if(i)i.oninput=e=>{ui.busca=e.target.value;const pos=e.target.selectionStart;render();const n=$('#pdBusca');n.focus();n.setSelectionRange(pos,pos)}}
+addPage('pending','alert','Pendências',view,'Tudo que precisa de alguém — vendas, banco e contas — agrupado por tipo, com o mais antigo e a ação.','',bind);
+if(navItems.filter(n=>n[0]==='pending').length>1)navItems.splice(navItems.map(n=>n[0]).lastIndexOf('pending'),1);
+})();
