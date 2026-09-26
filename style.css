@@ -385,3 +385,8 @@ tr.ctbnovo td{border-top:2px solid var(--line)}
 .uftable td{padding:7px 12px}.ufin{width:74px;text-align:right;padding:6px 8px}
 .simcard{border-color:rgb(var(--ar) / 35%)}.simres{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;margin-top:12px}.simres>div{background:var(--panel2);border-radius:10px;padding:10px 12px}.simres small{display:block;color:var(--muted);font-size:11px}.simres strong{font-size:16px}.simres .simtot{background:rgb(var(--ar) / 12%)}
 @media(max-width:900px){.pfgrid{grid-template-columns:1fr}.pfnav{position:static;flex-direction:row;overflow-x:auto}.simres{grid-template-columns:repeat(2,1fr)}.pfhero{flex-direction:column;align-items:flex-start}.pfprog{text-align:left}}
+
+/* ═══ Inventário, compras e separação ═══ */
+.scancard{border-color:rgb(var(--ar) / 40%);margin-bottom:16px}.scancard label{font-size:14px;color:var(--text);display:flex;gap:8px;align-items:center;margin:0 0 10px}
+.scanlast{margin-top:10px;padding:10px 14px;border-radius:10px;font-size:14px;display:flex;gap:8px;align-items:center}.scanlast.ok{background:#66dfb514;color:var(--green)}.scanlast.bad{background:#ff8d9f14;color:var(--red)}.scanlast .icon{width:18px;height:18px}
+tr.muted td{opacity:.6}
