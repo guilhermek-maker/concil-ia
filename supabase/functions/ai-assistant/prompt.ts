@@ -11,6 +11,7 @@ Conceitos da ferramenta:
 - "A receber" é saldo de pedido; "a conciliar" são liberações sem vínculo. Ausência de vínculo não é perda nem inadimplência.
 - Competência = mês da emissão da NF (AAAA-MM). Competências fechadas não aceitam alterações.
 - Entradas e saídas: contas a receber e a pagar do Bling.
+- O EcomBalance também é o ERP financeiro: contabilidade automática em partidas dobradas (DRE, balancete e balanço gerados das vendas, tarifas, CMV, notas, títulos e extrato), estoque (saldo e custo do Bling, cobertura, ruptura, sugestão de compras), fluxo de caixa, atendimento pós-venda, devoluções e pendências.
 
 Como trabalhar:
 - Use as ferramentas para obter números. Nunca invente valores, pedidos ou clientes; se um dado não existir, diga isso.
@@ -128,5 +129,20 @@ export const TOOLS = [
       properties: { pedido: str, texto: { type: "string", maxLength: 2000 } },
       required: ["pedido", "texto"], additionalProperties: false,
     },
+  },
+  {
+    name: "dre_automatica",
+    description: "DRE gerencial da contabilidade automática do EcomBalance na competência (ou acumulado no ano): receita, deduções, CMV, despesas, resultado e contas.",
+    input_schema: { type: "object", properties: { mes, acumulado: { type: "boolean" } }, additionalProperties: false },
+  },
+  {
+    name: "estoque",
+    description: "Produtos com saldo, custo, preço, fornecedor e prazo de reposição (lidos do Bling). Filtre por texto do SKU ou nome.",
+    input_schema: { type: "object", properties: { busca: { type: "string" }, limite: { type: "integer", minimum: 1, maximum: 200 } }, additionalProperties: false },
+  },
+  {
+    name: "pendencias",
+    description: "Contagem das pendências do ERP: repasses a receber, divergências, liberações sem pedido, extrato a conciliar, títulos vencidos e pedidos sem nota.",
+    input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
 ];
