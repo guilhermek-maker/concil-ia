@@ -72,7 +72,7 @@ function diario(){const k=[cfg.provisao,db.orders.length,(db.bankTx||[]).length,
   par(d,`${p.fornecedor||p.descricao}${p.documento?' · doc '+p.documento:''}${p.parcelas>1?` · ${p.parcela}/${p.parcelas}`:''}`,o,contaTrib(p.categoria),'2.1.01',p.valor+(p.juros||0)-(p.desconto||0));
   if(p.status==='pago'&&!pagosPeloBanco.has(p.id)&&p.pagoEm)par(p.pagoEm,`Pagamento sem extrato · ${p.fornecedor||p.descricao}${p.conta?' · '+p.conta:''}`,o,'2.1.01','1.1.09',p.valorPago||p.valor)}
  // Devoluções de clientes (notas de entrada de devolução).
- for(const n of db.purchases||[])if(n.tipo==='devolucao'&&n.emissao)par(n.emissao,`Devolução de venda · NF ${n.numero||''} · ${n.fornecedor||''}`,{tipo:'nota',id:n.id},'4.2.03','1.1.03.09',n.valor);
+ for(const n of db.purchases||[])if(n.tipo==='devolucao'&&n.emissao&&!/rejeit|cancel|denegad/i.test(n.situacao||''))par(n.emissao,`Devolução de venda · NF ${n.numero||''} · ${n.fornecedor||''}`,{tipo:'nota',id:n.id},'4.2.03','1.1.03.09',n.valor);
  // Vendas: receita bruta, tarifa e frete do vendedor por canal; CMV pelos itens × custo.
  const custo=new Map((db.products||[]).map(p=>[p.id,Number(p.custo)||0]));for(const p of window.Estoque?.lista?.()||[])if(Number(p.custo))custo.set(p.id,Number(p.custo));
  let semCusto=0;
