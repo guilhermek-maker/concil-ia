@@ -1,0 +1,46 @@
+'use strict';
+// Radar de margem: lucro de CADA pedido (venda − tarifa − frete do vendedor − custo das mercadorias − tributos
+// sobre a venda) e onde a empresa perde dinheiro: pedidos, produtos e canais com margem negativa, e tarifas
+// cobradas fora do padrão do canal (possível erro do marketplace a contestar).
+(()=>{
+Object.assign(paths,{radar:'M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z M12 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8z M12 12l6-6'});
+const ui={periodo:30,canal:'',aba:'produtos',meta:10};
+const menos=n=>{const d=new Date();d.setDate(d.getDate()-n);return d.toLocaleDateString('sv-SE')};
+const p1=v=>(v*100).toFixed(1).replace('.',',')+'%';
+let cache=null;
+function aliqTributos(){try{const ms=[...new Set(db.orders.map(o=>o.date.slice(0,7)))].sort().reverse();for(const m of ms){const d=window.Gestao?.dreMes?.(m);if(d?.fonte==='balancete'&&d.v?.receita>0)return {r:-(d.v.impostos||0)/d.v.receita,m}}}catch{}return {r:0.24,m:null}}
+function calcular(){const k=[db.orders.length,ui.periodo,(window.Estoque?.lista?.()||[]).length].join('|');if(cache?.k===k)return cache.v;
+ const ini=menos(ui.periodo),custo=new Map((db.products||[]).map(p=>[p.id,{c:Number(p.custo)||0,e:Number(p.embalagem)||0}]));for(const p of window.Estoque?.lista?.()||[])if(Number(p.custo))custo.set(p.id,{c:Number(p.custo),e:custo.get(p.id)?.e||0});
+ const {r:aliq,m:mesAliq}=aliqTributos(),peds=[],cancelados=[];let semCusto=0;
+ for(const o of db.orders){if(o.date<ini)continue;
+  // Tarifa ≥ 95% da venda = pedido cancelado/reembolsado (o marketplace não repassa nada): fora da margem.
+  if(o.gross>0&&o.fee>=o.gross*0.95){cancelados.push(o);continue}let cmv=0,falta=false;for(const it of o.items||[]){const c=custo.get(String(it.sku||'').trim());if(c){cmv+=(c.c+c.e)*(Number(it.qty)||0)}else falta=true}
+  if(falta){semCusto++;continue}const frete=o.shipping&&/API/.test(o.source||'')&&!/Bling/.test(o.source||'')?o.shipping:0,trib=o.gross*aliq,lucro=o.gross-o.fee-frete-cmv-trib;
+  peds.push({o,cmv,frete,trib,lucro,m:o.gross?lucro/o.gross:0,feeP:o.gross?o.fee/o.gross:0})}
+ // Tarifa fora do padrão: acima de 1,5× a mediana do canal para o mesmo produto principal.
+ const med=new Map();for(const x of peds){const k=x.o.platform+'|'+(x.o.items?.[0]?.sku||'');(med.get(k)||med.set(k,[]).get(k)).push(x.feeP)}
+ for(const [k,l] of med){l.sort((a,b)=>a-b);med.set(k,l[Math.floor(l.length/2)])}
+ for(const x of peds){const md=med.get(x.o.platform+'|'+(x.o.items?.[0]?.sku||''));x.tarifaFora=md>0&&x.feeP>md*1.5&&x.o.fee-x.o.gross*md>5;x.tarifaExcesso=md?x.o.fee-x.o.gross*md:0}
+ cache={k,v:{peds,aliq,mesAliq,semCusto,cancelados}};return cache.v}
+function agrupar(peds,chave){const m=new Map();for(const x of peds){const ks=chave(x);for(const [k,peso] of ks){const g=m.get(k)||{k,n:0,venda:0,lucro:0,neg:0};g.n+=peso;g.venda+=x.o.gross*peso;g.lucro+=x.lucro*peso;if(x.lucro<0)g.neg+=peso;m.set(k,g)}}return [...m.values()].map(g=>({...g,m:g.venda?g.lucro/g.venda:0}))}
+function view(){const {peds,aliq,mesAliq,semCusto,cancelados}=calcular(),l=peds.filter(x=>!ui.canal||x.o.platform===ui.canal);
+ const venda=l.reduce((s,x)=>s+x.o.gross,0),lucro=l.reduce((s,x)=>s+x.lucro,0),neg=l.filter(x=>x.lucro<0),perda=neg.reduce((s,x)=>s+x.lucro,0),fora=l.filter(x=>x.tarifaFora),excesso=fora.reduce((s,x)=>s+x.tarifaExcesso,0);
+ const canais=[...new Set(peds.map(x=>x.o.platform))];
+ const prods=agrupar(l,x=>{const t=(x.o.items||[]).reduce((s,i)=>s+(Number(i.qty)||0)*(Number(i.price)||0),0)||1;return (x.o.items||[]).map(i=>[i.title||i.sku,(Number(i.qty)||0)*(Number(i.price)||0)/t])}).filter(g=>g.n>=1).sort((a,b)=>a.m-b.m);
+ const porCanal=agrupar(l,x=>[[x.o.platform,1]]).sort((a,b)=>b.venda-a.venda);
+ const kpi=(t,v,s,tom)=>`<div class="card kpi"><span class="kpil">${t}</span><span class="kpiv ${tom||''}">${v}</span><span class="kpis">${s}</span></div>`;
+ return `<div class="notice">Lucro por pedido = venda − tarifa do marketplace − frete pago pelo vendedor − custo dos produtos (custo + embalagem) − tributos sobre a venda (${p1(aliq)}${mesAliq?`, alíquota efetiva do balancete de ${mesAliq.slice(5)}/${mesAliq.slice(0,4)}`:', estimada'}). Não inclui despesas fixas. ${cancelados.length?`${cancelados.filter(o=>!ui.canal||o.platform===ui.canal).length} pedido(s) cancelados/reembolsados (${money(cancelados.filter(o=>!ui.canal||o.platform===ui.canal).reduce((s,o)=>s+o.gross,0))}) ficaram fora da conta.`:''}${semCusto?` <span class="gold">${semCusto} pedido(s) fora da conta por falta de custo do produto.</span>`:''}</div>
+ <div class="grid kpis4">${kpi('Margem de contribuição',p1(venda?lucro/venda:0),`${money(lucro)} em ${money(venda)} vendidos`,lucro<0?'red':'green')}${kpi('Pedidos com prejuízo',neg.length.toLocaleString('pt-BR'),`${money(perda)} perdidos · ${p1(l.length?neg.length/l.length:0)} dos pedidos`,neg.length?'red':'')}${kpi('Tarifa fora do padrão',fora.length.toLocaleString('pt-BR'),`${money(excesso)} acima do normal · vale contestar`,fora.length?'gold':'')}${kpi('Meta de margem',`${ui.meta}%`,`${prods.filter(g=>g.m*100<ui.meta).length} produto(s) abaixo`)}</div>
+ <div class="crmbar"><div class="segtabs">${[['produtos','Por produto'],['canais','Por canal'],['pedidos','Pedidos com prejuízo'],['tarifas','Tarifas fora do padrão']].map(([k,t])=>`<button class="${ui.aba===k?'active':''}" data-mg-aba="${k}">${t}</button>`).join('')}</div>
+  <div class="segtabs">${[['','Todos'],...canais.map(c=>[c,c])].map(([k,t])=>`<button class="${ui.canal===k?'active':''}" data-mg-canal="${esc(k)}">${esc(t)}</button>`).join('')}</div><select data-mg-per aria-label="Período">${[7,30,60,90].map(n=>`<option value="${n}" ${ui.periodo===n?'selected':''}>Últimos ${n} dias</option>`).join('')}</select><label class="caption">Meta <input data-mg-meta type="number" value="${ui.meta}" style="width:60px">%</label></div>
+ ${ui.aba==='produtos'?tabela(['Produto','Pedidos','Vendido','Lucro','Margem','Pedidos negativos'],prods.slice(0,200).map(g=>[`<strong>${esc(g.k)}</strong>`,g.n.toFixed(0),money(g.venda),`<span class="${g.lucro<0?'red':''}">${money(g.lucro)}</span>`,barra(g.m),g.neg?`<span class="badge bad">${g.neg.toFixed(0)}</span>`:'—']))
+ :ui.aba==='canais'?tabela(['Canal','Pedidos','Vendido','Lucro','Margem','Pedidos negativos'],porCanal.map(g=>[`<strong>${esc(g.k)}</strong>`,g.n.toLocaleString('pt-BR'),money(g.venda),money(g.lucro),barra(g.m),`${g.neg} (${p1(g.n?g.neg/g.n:0)})`]))
+ :ui.aba==='pedidos'?tabela(['Pedido','Canal','Data','Venda','Tarifa','Frete','Custo','Tributos','Lucro'],neg.sort((a,b)=>a.lucro-b.lucro).slice(0,300).map(x=>[`<span class="mono clickrow" data-order="${esc(x.o.id)}">${esc(x.o.id)}</span><br><span class="caption">${esc((x.o.items||[]).map(i=>i.title||i.sku).join(' · ').slice(0,60))}</span>`,esc(x.o.platform),new Date(x.o.date+'T12:00:00').toLocaleDateString('pt-BR'),money(x.o.gross),money(x.o.fee),money(x.frete),money(x.cmv),money(x.trib),`<strong class="red">${money(x.lucro)}</strong>`]))
+ :tabela(['Pedido','Canal','Produto','Venda','Tarifa','% cobrado','Normal do canal','Excesso'],fora.sort((a,b)=>b.tarifaExcesso-a.tarifaExcesso).slice(0,300).map(x=>[`<span class="mono clickrow" data-order="${esc(x.o.id)}">${esc(x.o.id)}</span>`,esc(x.o.platform),esc((x.o.items?.[0]?.title||'').slice(0,50)),money(x.o.gross),money(x.o.fee),p1(x.feeP),p1(x.feeP-x.tarifaExcesso/x.o.gross),`<strong class="gold">${money(x.tarifaExcesso)}</strong>`]))}`}
+const barra=m=>`<span class="mgbar"><i class="${m<0?'neg':m*100<ui.meta?'low':''}" style="width:${Math.min(100,Math.abs(m)*250)}%"></i></span> <span class="${m<0?'red':''}">${p1(m)}</span>`;
+const tabela=(cab,linhas)=>`<div class="tablebox"><div class="tablewrap"><table><thead><tr>${cab.map((c,i)=>`<th class="${i?'num':''}">${c}</th>`).join('')}</tr></thead><tbody>${linhas.map(l=>`<tr>${l.map((c,i)=>`<td class="${i?'num':''}">${c}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${cab.length}" class="empty">Nada aqui. ✓</td></tr>`}</tbody></table></div></div>`;
+document.addEventListener('click',e=>{const b=e.target.closest('[data-mg-aba],[data-mg-canal]');if(!b)return;if(b.dataset.mgAba)ui.aba=b.dataset.mgAba;if(b.dataset.mgCanal!==undefined)ui.canal=b.dataset.mgCanal;render()});
+function bind(){const s=$('[data-mg-per]');if(s)s.onchange=()=>{ui.periodo=Number(s.value);cache=null;render()};const m=$('[data-mg-meta]');if(m)m.onchange=()=>{ui.meta=Number(m.value)||0;render()}}
+addPage('margem','radar','Radar de margem',view,'Lucro de cada pedido e onde a empresa perde dinheiro: produtos, canais, pedidos com prejuízo e tarifas fora do padrão.','',bind);
+window.Margem={resumo:()=>{const {peds}=calcular();const neg=peds.filter(x=>x.lucro<0);return {pedidos:peds.length,prejuizo:neg.length,perda:neg.reduce((s,x)=>s+x.lucro,0)}}};
+})();
