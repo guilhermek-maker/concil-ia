@@ -1,0 +1,20 @@
+{
+  "name": "EcomBalance · Compra Store",
+  "short_name": "EcomBalance",
+  "description": "ERP do e-commerce: vendas, estoque, financeiro, fiscal e contabilidade.",
+  "start_url": "./#central",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090c13",
+  "theme_color": "#090c13",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "brand/comprastore-logo-240.png", "sizes": "240x240", "type": "image/png", "purpose": "any" },
+    { "src": "brand/comprastore-logo.png", "sizes": "640x640", "type": "image/png", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Inventário", "url": "./#inventario" },
+    { "name": "Separação do dia", "url": "./#separacao" },
+    { "name": "Atendimento", "url": "./#atendimento" }
+  ]
+}
