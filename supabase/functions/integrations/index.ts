@@ -7,7 +7,8 @@ import { persist, provider, providers, validSecret } from "../_shared/store.ts";
 import { importShopeeIncome } from "../_shared/shopee_central.ts";
 import { responderML, sincronizarAtendimentoML } from "../_shared/atendimento_ml.ts";
 import { sugerirAtendimento } from "../_shared/atendimento_ia.ts";
-import { sincronizarEstoqueBling } from "../_shared/estoque_bling.ts";
+import { detalhesFiscaisBling, sincronizarEstoqueBling } from "../_shared/estoque_bling.ts";
+import { cancelarNFe, configFiscal, consultarNFe, emitirNFe, statusFiscal } from "../_shared/nfe_focus.ts";
 import { executarReguasML } from "../_shared/reguas_ml.ts";
 
 const required: Record<string, string[]> = {
@@ -161,7 +162,7 @@ Deno.serve(handler(async (req) => {
     // Estoque (Bling): produtos, custo e saldo.
     for (const i of list.filter((x) => x.provider === "bling" && (!x.settings?.estoque?.fim || Date.now() - new Date(x.settings.estoque.fim).getTime() > ESTOQUE_MS))) {
       try {
-        const r = await sincronizarEstoqueBling(db, i.workspace_id, Math.min(deadline - 20_000, Date.now() + 60_000));
+        const r = { ...(await sincronizarEstoqueBling(db, i.workspace_id, Math.min(deadline - 20_000, Date.now() + 60_000))), ...(await detalhesFiscaisBling(db, i.workspace_id, 60).catch((e) => ({ fiscais_erro: String(e) }))) };
         await writeSettings(db, i.workspace_id, i.provider, (s) => { s.estoque = { ...r, fim: new Date().toISOString() }; });
         report.push({ workspace_id: i.workspace_id, estoque: r });
       } catch (e) { report.push({ workspace_id: i.workspace_id, estoque_erro: String(e) }); }
@@ -233,6 +234,15 @@ Deno.serve(handler(async (req) => {
         suframa: o.suframa?.[0]?.number ?? "", receitaEm: new Date().toISOString().slice(0, 10),
       });
     }
+    case "fiscal_status": {
+      const cfg = await configFiscal(db, ws);
+      const { data: prods } = await db.from("produtos").select("id,ncm,origem").eq("workspace_id", ws);
+      return json({ ...statusFiscal(cfg), config: cfg, produtos: (prods ?? []).length, sem_ncm: (prods ?? []).filter((p) => !p.ncm).map((p) => p.id) });
+    }
+    case "fiscal_ler_produtos": return json(await detalhesFiscaisBling(db, ws, 150));
+    case "fiscal_emitir": return json(await emitirNFe(db, ws, String(body.pedido ?? ""), user.email ?? user.id, body.producao === true));
+    case "fiscal_consultar": return json(await consultarNFe(db, ws, String(body.ref ?? "")));
+    case "fiscal_cancelar": return json(await cancelarNFe(db, ws, String(body.ref ?? ""), String(body.justificativa ?? "")));
     case "estoque_sync": {
       const r = await sincronizarEstoqueBling(db, ws);
       await writeSettings(db, ws, "bling", (s) => { s.estoque = { ...r, fim: new Date().toISOString() }; });
