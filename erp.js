@@ -24,7 +24,7 @@ const MODS=[
  {id:'fin',ic:'wallet',t:'Financeiro',grupos:[['A pagar',['pagar','compras']],['Bancos',['tesouraria','concbanco']],['Caixa',['fluxo']]]},
  {id:'crm',ic:'heart',t:'CRM',grupos:[['CRM',['crm','crmclientes','crmprodutos','crmgeo','crmacoes']]]},
  {id:'cad',ic:'folder',t:'Cadastros',grupos:[['Parceiros',['fornecedores']],['Financeiro',['cadcontas','categorias','centros']],['Produtos',['cadprodutos']]]},
- {id:'res',ic:'chart',t:'Resultado',grupos:[['Contábil',['contabil']]]},
+ {id:'res',ic:'chart',t:'Resultado',grupos:[['Contabilidade',['contabauto','contabil']]]},
  {id:'pre',ic:'tag',t:'Preços',grupos:[['Formação de preço',['precos']]]},
  {id:'rel',ic:'print',t:'Relatórios',grupos:[['Relatórios',['relfin','reports']]]}];
 const GERAL=['equipe','ai','history','auditoria','lancamento','imports'];
