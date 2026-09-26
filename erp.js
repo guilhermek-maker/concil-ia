@@ -50,7 +50,7 @@ let paginaAnterior=null;
 shell=function(){const pm=modDe(page);if(pm)modAtual=pm;if(page!==paginaAnterior){paginaAnterior=page;menuSel=null}const M=MODS.find(m=>m.id===modAtual)||MODS[0],cur=nomePag(page),av=avisos();
  const item=id=>{const n=navItems.find(x=>x[0]===id);if(!n)return '';const c=contagens();const badge=id==='pagar'&&c.vencidos.length?c.vencidos.length:id==='concbanco'&&c.extrato?c.extrato:id==='equipe'&&c.acessos?c.acessos:id==='atendimento'?(window.Atendimento?.abertos?.()||0):0;
   return `<button data-nav="${id}" class="${page===id?'active':''}">${ico(n[1],17)}<span>${n[2]}</span>${badge?`<em class="navcount">${badge}</em>`:''}</button>`};
- const meses=[...new Set([month,...db.orders.map(o=>o.date.slice(0,7)),...P().map(t=>t.vencimento.slice(0,7))])].filter(m=>m>='2020').sort().reverse().slice(0,36);
+ const meses=[...new Set([month,...db.orders.map(o=>o.date.slice(0,7)),...P().map(t=>t.vencimento.slice(0,7))])].filter(m=>m>='2020'&&m<=addMeses(hoje(),3).slice(0,7)).sort().reverse().slice(0,36);
  const emp=esc(window.Cloud?.wsName||'Minha empresa');
  $('#app').innerHTML=`<div class="erp">
  <aside class="side"><button class="sidebrand" data-nav="central" aria-label="Início"><img class="sidelogo" src="brand/comprastore-logo-240.png" alt=""><span><strong>${emp}</strong><small>EcomBalance · ERP</small></span></button>
