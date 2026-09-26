@@ -372,3 +372,6 @@ tr.ctbnovo td{border-top:2px solid var(--line)}
 .tl360{max-height:240px;overflow:auto}.tl360 .event{padding-bottom:14px}
 .reguas{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}.regua textarea{min-height:76px}
 .switch{display:inline-flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:12px;color:var(--text)}.switch input{accent-color:var(--accent);width:18px;height:18px}
+
+/* ═══ Celular: abas de filtro rolam na horizontal em vez de vazar ═══ */
+.crmbar .segtabs{max-width:100%;overflow-x:auto;scrollbar-width:thin}.crmbar .segtabs button{flex:none}
