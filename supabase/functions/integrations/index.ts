@@ -8,6 +8,7 @@ import { importShopeeIncome } from "../_shared/shopee_central.ts";
 import { responderML, sincronizarAtendimentoML } from "../_shared/atendimento_ml.ts";
 import { sugerirAtendimento } from "../_shared/atendimento_ia.ts";
 import { sincronizarEstoqueBling } from "../_shared/estoque_bling.ts";
+import { executarReguasML } from "../_shared/reguas_ml.ts";
 
 const required: Record<string, string[]> = {
   bling: ["BLING_CLIENT_ID", "BLING_CLIENT_SECRET"],
@@ -145,6 +146,17 @@ Deno.serve(handler(async (req) => {
         await writeSettings(db, i.workspace_id, i.provider, (s) => { s.atendimento = { ...r, fim: new Date().toISOString() }; });
         report.push({ workspace_id: i.workspace_id, atendimento: r });
       } catch (e) { report.push({ workspace_id: i.workspace_id, atendimento_erro: String(e) }); }
+    }
+    // Réguas de relacionamento (Mercado Livre): de hora em hora, só para as réguas ligadas no portal.
+    for (const i of list.filter((x) => x.provider === "mercadolivre" && (!x.settings?.reguas?.fim || Date.now() - new Date(x.settings.reguas.fim).getTime() > HOURLY_MS))) {
+      try {
+        const r = await executarReguasML(db, i.workspace_id);
+        await writeSettings(db, i.workspace_id, i.provider, (s) => { s.reguas = { ...r, fim: new Date().toISOString() }; });
+        report.push({ workspace_id: i.workspace_id, reguas: r });
+      } catch (e) {
+        await writeSettings(db, i.workspace_id, i.provider, (s) => { s.reguas = { erro: String(e).slice(0, 300), fim: new Date().toISOString() }; });
+        report.push({ workspace_id: i.workspace_id, reguas_erro: String(e) });
+      }
     }
     // Estoque (Bling): produtos, custo e saldo.
     for (const i of list.filter((x) => x.provider === "bling" && (!x.settings?.estoque?.fim || Date.now() - new Date(x.settings.estoque.fim).getTime() > ESTOQUE_MS))) {
