@@ -13,10 +13,10 @@ const PLANO=[
  ['1.1.03','Marketplaces a receber e carteiras','A'],['1.1.03.01','Mercado Livre / Mercado Pago','A'],['1.1.03.02','Shopee','A'],['1.1.03.03','Magalu','A'],['1.1.03.09','Outros canais','A'],
  ['1.1.04','Estoque de mercadorias','A'],['1.1.09','Pagamentos por outro meio (a identificar)','A'],
  ['1.2','Ativo não circulante — imobilizado','A'],['1.2.01','Veículos','A'],['1.2.02','Máquinas e equipamentos','A'],['1.2.03','Móveis e utensílios','A'],
- ['2','PASSIVO','P'],['2.1','Passivo circulante','P'],['2.1.01','Fornecedores e contas a pagar','P'],
+ ['2','PASSIVO','P'],['2.1','Passivo circulante','P'],['2.1.01','Fornecedores e contas a pagar','P'],['2.1.02','Tributos sobre vendas a recolher','P'],
  ['3','PATRIMÔNIO LÍQUIDO','P'],['3.1','Capital social','P'],['3.1.01','Capital integralizado','P'],['3.9','Saldos de abertura','P'],['3.9.01','Saldos de abertura (implantação)','P'],['3.8','Resultado do período','P'],
  ['4','RECEITAS','R'],['4.1','Receita bruta de vendas','R'],['4.1.01','Vendas Mercado Livre','R'],['4.1.02','Vendas Shopee','R'],['4.1.03','Vendas Magalu','R'],['4.1.09','Vendas outros canais','R'],
- ['4.2','(−) Deduções da receita','R'],['4.2.01','PIS e COFINS','R'],['4.2.02','ICMS e DIFAL (GNRE/DARE)','R'],['4.2.03','Devoluções de vendas','R'],
+ ['4.2','(−) Deduções da receita','R'],['4.2.01','PIS e COFINS','R'],['4.2.02','ICMS e DIFAL (GNRE/DARE)','R'],['4.2.03','Devoluções de vendas','R'],['4.2.04','Tributos sobre vendas (provisão)','R'],
  ['4.3','Receitas financeiras e outras','R'],['4.3.01','Rendimentos de aplicações','R'],['4.3.02','Outras receitas','R'],
  ['5','CUSTOS','D'],['5.1','Custo das vendas','D'],['5.1.01','Custo das mercadorias vendidas (CMV)','D'],['5.1.02','Embalagens','D'],
  ['6','DESPESAS','D'],['6.1','Despesas de venda','D'],['6.1.01','Tarifas de marketplace','D'],['6.1.02','Fretes e logística','D'],['6.1.03','Marketing e anúncios','D'],
@@ -31,11 +31,19 @@ const CAT={'Compra de mercadorias':'1.1.04','Embalagens':'5.1.02','ICMS DIFAL / 
 const contaCat=c=>CAT[c]||(/icms|difal|gnre/i.test(c||'')?'4.2.02':/tarifa/i.test(c||'')?'6.1.01':/frete/i.test(c||'')?'6.1.02':'6.9.01');
 const PLAT={'Mercado Livre':'01','Shopee':'02','Magalu':'03'};const pl=p=>PLAT[p]||'09';
 
+// ─────────────── Tributos sobre vendas (competência) ───────────────
+// Provisiona ICMS/DIFAL/PIS/COFINS pela alíquota efetiva do escritório (tributos ÷ receita do balancete do mês);
+// sem balancete no mês, usa a última alíquota conhecida. Os pagamentos (GNRE/DARE/DARF de PIS-COFINS) baixam a provisão.
+const cfg={provisao:true};try{Object.assign(cfg,JSON.parse(localStorage.getItem('eb_contab')||'{}'))}catch{}
+function aliquotas(meses){const out=new Map();let ult=null;for(const m of meses){let r=null;try{const d=window.Gestao?.dreMes?.(m);if(d?.fonte==='balancete'&&d.v?.receita>0)r=-(d.v.impostos||0)/d.v.receita}catch{}if(r!=null&&r>0&&r<0.6){ult={r,m,fonte:'balancete'};out.set(m,ult)}else if(ult)out.set(m,{r:ult.r,m:ult.m,fonte:'estimada'})}return out}
+const TRIB=new Set(['ICMS DIFAL / GNRE','PIS e COFINS']);
+const contaTrib=c=>cfg.provisao&&TRIB.has(c)?'2.1.02':contaCat(c);
+
 // ─────────────── Geração do diário ───────────────
-let cache=null;
+let cache=null;let aliqCache=new Map();
 function contas(){const m=new Map(PLANO.map(([c,n,t])=>[c,{c,n,t}]));let i=1,j=1;
  for(const a of db.bankAccounts||[]){const cod=a.tipo==='aplicacao'?`1.1.02.${String(j++).padStart(2,'0')}`:`1.1.01.${String(i++).padStart(2,'0')}`;m.set(cod,{c:cod,n:a.nome,t:'A',banco:a.id})}return m}
-function diario(){const k=[db.orders.length,(db.bankTx||[]).length,(db.payables||[]).length,(db.purchases||[]).length,(db.bankAccounts||[]).length,(window.Estoque?.lista?.()||[]).length].join('|');if(cache?.k===k)return cache.v;
+function diario(){const k=[cfg.provisao,db.orders.length,(db.bankTx||[]).length,(db.payables||[]).length,(db.purchases||[]).length,(db.bankAccounts||[]).length,(window.Estoque?.lista?.()||[]).length].join('|');if(cache?.k===k)return cache.v;
  const plano=contas(),banco=new Map([...plano.values()].filter(x=>x.banco).map(x=>[x.banco,x.c])),L=[];
  const lanc=(d,hist,orig,linhas)=>{linhas=linhas.filter(([,v])=>Math.abs(v)>=0.005);if(linhas.length)L.push({d,hist,orig,l:linhas})}; // l: [conta, valor>0 débito / <0 crédito]
  const par=(d,hist,orig,deb,cred,v)=>{v=Math.round(v*100)/100;if(!v)return;if(v<0){[deb,cred]=[cred,deb];v=-v}lanc(d,hist,orig,[[deb,v],[cred,-v]])};
@@ -44,10 +52,10 @@ function diario(){const k=[db.orders.length,(db.bankTx||[]).length,(db.payables|
  for(const a of db.bankAccounts||[]){if(!a.dataSaldoInicial)continue;const c=banco.get(a.id);
   if(a.tipo==='aplicacao'){// Aplicação: o saldo do extrato já inclui aplicações e rendimentos até a data; separamos o que veio da conta corrente.
    const aplicado=(db.bankTx||[]).filter(t=>t.status==='conciliado'&&t.vinculo?.tipo==='aplicacao'&&t.origem!=='espelho'&&t.data<=a.dataSaldoInicial&&destinoAplic(t,a)).reduce((s,t)=>s-t.valor,0);
-   par(a.dataSaldoInicial,`Saldo de abertura · ${a.nome}`,{tipo:'abertura',id:a.id},c,'3.9.01',a.saldoInicial-aplicado-rendAte(a))}
+   // Tudo que foi aplicado saiu da conta corrente (lançado abaixo); a diferença até o extrato são os rendimentos acumulados.
+   par(a.dataSaldoInicial,`Rendimentos acumulados até ${new Date(a.dataSaldoInicial+'T12:00:00').toLocaleDateString('pt-BR')} · ${a.nome} (diferença do extrato)`,{tipo:'rendimento',id:a.id},c,'4.3.01',a.saldoInicial-aplicado)}
   else par(a.dataSaldoInicial,`Saldo de abertura · ${a.nome}`,{tipo:'abertura',id:a.id},c,'3.9.01',a.saldoInicial||0)}
- function destinoAplic(t,a){const d=normalized(t.descricao);if(/cdb/.test(d))return /cdb/.test(normalized(a.nome));if(/mapfre|frerffi|fundo/.test(d))return /fundo|mapfre/.test(normalized(a.nome));return false}
- function rendAte(){return 0}
+ function destinoAplic(t,a){const d=normalized(t.descricao);if(/cdb/.test(d))return /cdb/.test(normalized(a.nome));if(/mapfre|frerffi|fundo|kinea|actv|^int (aplicacao|resgate)/.test(d))return /fundo|mapfre/.test(normalized(a.nome));return false}
  const aplicDe=t=>{const a=(db.bankAccounts||[]).find(x=>x.tipo==='aplicacao'&&destinoAplic(t,x));return a?banco.get(a.id):'1.1.02.99'};
  // Extrato bancário (regime de caixa das contas bancárias).
  const pagosPeloBanco=new Set();
@@ -58,10 +66,10 @@ function diario(){const k=[db.orders.length,(db.bankTx||[]).length,(db.payables|
   if(v.tipo==='transferencia'){const d=normalized((v.desc||'')+' '+h);const outra=/mercado pago|wolfach/.test(d)?'1.1.03.01':/shopee|maree/.test(d)?'1.1.03.02':/magalu/.test(d)?'1.1.03.03':/saque|caixa/.test(d)?'1.1.01.90':'1.1.01.99';par(t.data,v.desc||h,o,c,outra,t.valor);continue}
   // Despesa ou receita direto no extrato.
   if(v.tipo==='despesa'&&String(v.id||'').startsWith('EXT-'))pagosPeloBanco.add(v.id);
-  par(t.data,v.desc||h,o,c,contaCat(v.categoria||t.categoria),t.valor)}
+  par(t.data,v.desc||h,o,c,contaTrib(v.categoria||t.categoria),t.valor)}
  // Títulos (competência): notas de entrada e recorrentes/lançamentos entram em Fornecedores; os criados pelo extrato já estão acima.
  for(const p of db.payables||[]){if(p.status==='cancelado'||p.origem==='extrato')continue;const d=p.emissao||p.vencimento;if(!d)continue;const o={tipo:'titulo',id:p.id};
-  par(d,`${p.fornecedor||p.descricao}${p.documento?' · doc '+p.documento:''}${p.parcelas>1?` · ${p.parcela}/${p.parcelas}`:''}`,o,contaCat(p.categoria),'2.1.01',p.valor+(p.juros||0)-(p.desconto||0));
+  par(d,`${p.fornecedor||p.descricao}${p.documento?' · doc '+p.documento:''}${p.parcelas>1?` · ${p.parcela}/${p.parcelas}`:''}`,o,contaTrib(p.categoria),'2.1.01',p.valor+(p.juros||0)-(p.desconto||0));
   if(p.status==='pago'&&!pagosPeloBanco.has(p.id)&&p.pagoEm)par(p.pagoEm,`Pagamento sem extrato · ${p.fornecedor||p.descricao}${p.conta?' · '+p.conta:''}`,o,'2.1.01','1.1.09',p.valorPago||p.valor)}
  // Devoluções de clientes (notas de entrada de devolução).
  for(const n of db.purchases||[])if(n.tipo==='devolucao'&&n.emissao)par(n.emissao,`Devolução de venda · NF ${n.numero||''} · ${n.fornecedor||''}`,{tipo:'nota',id:n.id},'4.2.03','1.1.03.09',n.valor);
@@ -69,10 +77,13 @@ function diario(){const k=[db.orders.length,(db.bankTx||[]).length,(db.payables|
  const custo=new Map((db.products||[]).map(p=>[p.id,Number(p.custo)||0]));for(const p of window.Estoque?.lista?.()||[])if(Number(p.custo))custo.set(p.id,Number(p.custo));
  let semCusto=0;
  for(const o of db.orders){const a=`1.1.03.${pl(o.platform)}`,r=`4.1.${pl(o.platform)}`,orig={tipo:'pedido',id:o.id};
-  const linhas=[[a,o.gross],[r,-o.gross]];if(o.fee){linhas.push(['6.1.01',o.fee],[a,-o.fee])}if(o.shipping){linhas.push(['6.1.02',o.shipping],[a,-o.shipping])}
+  const linhas=[[a,o.gross],[r,-o.gross]];if(o.fee){linhas.push(['6.1.01',o.fee],[a,-o.fee])}// Frete só é custo do vendedor quando vem da API do marketplace; no pedido do Bling é o frete da nota (pago pelo comprador).
+  if(o.shipping&&/API/.test(o.source||'')&&!/Bling/.test(o.source||'')){linhas.push(['6.1.02',o.shipping],[a,-o.shipping])}
   lanc(o.date,`Venda ${o.platform} · pedido ${o.id}`,orig,linhas);
   let cmv=0;for(const it of o.items||[]){const c=custo.get(String(it.sku||'').trim());if(c)cmv+=c*(Number(it.qty)||0);else semCusto++}
   if(cmv)par(o.date,`CMV · pedido ${o.id}`,orig,'5.1.01','1.1.04',cmv)}
+ if(cfg.provisao){const rec=new Map();for(const o of db.orders){const m=o.date.slice(0,7);rec.set(m,(rec.get(m)||0)+o.gross)}const meses=[...rec.keys()].sort();aliqCache=aliquotas(meses);
+  for(const m of meses){const a=aliqCache.get(m);if(!a)continue;par(fim(m),`Tributos sobre vendas de ${m.slice(5)}/${m.slice(0,4)} · ${(a.r*100).toFixed(1).replace('.',',')}% (${a.fonte==='balancete'?'balancete do escritório':'alíquota de '+a.m.slice(5)+'/'+a.m.slice(0,4)})`,{tipo:'provisao',id:m},'4.2.04','2.1.02',rec.get(m)*a.r)}}
  L.sort((a,b)=>a.d.localeCompare(b.d));cache={k,v:{L,plano,semCusto}};return cache.v}
 
 // ─────────────── Saldos ───────────────
@@ -105,7 +116,7 @@ function dre(){const {ini,fim:f}=periodo(),{s}=saldos(f,ini),mov=c=>{const x=s.g
  ${l('(−) CMV',-mov('5.1.01'),'n3 clickrow','5.1.01')}${l('(−) Embalagens',-mov('5.1.02'),'n3 clickrow','5.1.02')}${l('Lucro bruto',lb,'ctbgrupo')}
  ${l('(−) Tarifas de marketplace',-mov('6.1.01'),'n3 clickrow','6.1.01')}${l('(−) Fretes',-mov('6.1.02'),'n3 clickrow','6.1.02')}${l('(−) Marketing',-mov('6.1.03'),'n3 clickrow','6.1.03')}${l('(−) Pessoal',-pes,'n3')}${l('(−) Administrativas',-adm,'n3')}${l('(−) Impostos e taxas',-imp,'n3')}${l('(−) Outras',-out,'n3')}
  ${l('Resultado operacional',ebitda,'ctbgrupo')}${l('Resultado financeiro',fin,'n3')}${l('Resultado do período',res,'ctbgrupo ctbfinal')}</tbody></table></div></div>
- <div class="card"><h2>Como ler</h2><p class="caption" style="line-height:1.8">A DRE sai direto do diário: vendas e tarifas pelos pedidos, CMV pelos itens vendidos × custo do produto (Bling/Tabela de preços), notas e títulos pela data de emissão, e o que foi pago direto no banco (GNRE, aluguel, pró-labore…) pela data do extrato.<br><br>Compare com a <button class="small quiet" data-nav="contabil">DRE do escritório</button> para achar diferenças de classificação ou de data.${diario().semCusto?`<br><br><span class="gold">${diario().semCusto} item(ns) vendido(s) sem custo cadastrado — o CMV fica subestimado. Cadastre o custo em Estoque ou na Tabela de preços.</span>`:''}</p></div></div>`}
+ <div class="card"><h2>Como ler</h2><label class="check-l"><input type="checkbox" class="check" id="ctProv" ${cfg.provisao?'checked':''}> Tributos sobre vendas por competência (provisão pela alíquota efetiva do escritório${aliqCache.get(month)?': '+(aliqCache.get(month).r*100).toFixed(1).replace('.',',')+'%':''})</label><p class="caption">Desligado, os tributos entram só quando são pagos (GNRE/DARE).</p><p class="caption" style="line-height:1.8">A DRE sai direto do diário: vendas e tarifas pelos pedidos, CMV pelos itens vendidos × custo do produto (Bling/Tabela de preços), notas e títulos pela data de emissão, e o que foi pago direto no banco (GNRE, aluguel, pró-labore…) pela data do extrato.<br><br>Compare com a <button class="small quiet" data-nav="contabil">DRE do escritório</button> para achar diferenças de classificação ou de data.${diario().semCusto?`<br><br><span class="gold">${diario().semCusto} item(ns) vendido(s) sem custo cadastrado — o CMV fica subestimado. Cadastre o custo em Estoque ou na Tabela de preços.</span>`:''}</p></div></div>`}
 
 function balanco(){const {fim:f}=periodo(),{s}=saldos(f),sal=c=>{const x=s.get(c);return x?x.deb-x.cred:0};
  const res=-(sal('4')+sal('5')+sal('6'));const ativo=sal('1')+sal('9'),passivo=-sal('2'),pl=-sal('3')+res;
@@ -141,7 +152,7 @@ function csv(tipo){const {ini,fim:f}=periodo();let cab,linhas;
  else{const {s,plano}=saldos(f,ini);cab=['conta','nome','saldo_anterior','debitos','creditos','saldo_atual'];linhas=[...s.keys()].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).map(c=>{const x=s.get(c);return [c,plano.get(c)?.n||c,valorNat(c,x.ant).toFixed(2).replace('.',','),x.deb.toFixed(2).replace('.',','),x.cred.toFixed(2).replace('.',','),valorNat(c,x.ant+x.deb-x.cred).toFixed(2).replace('.',',')]})}
  const txt=[cab,...linhas].map(l=>l.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+txt],{type:'text/csv'}));a.download=`${tipo}-${ini}-a-${f}.csv`;a.click()}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-ct-aba],[data-ct-conta],[data-ct-csv]');if(!b)return;const d=b.dataset;if(d.ctAba){ui.aba=d.ctAba;render()}if(d.ctConta)razao(d.ctConta);if(d.ctCsv)csv(d.ctCsv)});
-function bind(){const a=$('#ctAcum');if(a)a.onchange=()=>{ui.acumulado=a.checked;render()};const i=$('#ctBusca');if(i)i.oninput=e=>{ui.busca=e.target.value;const pos=e.target.selectionStart;render();const n=$('#ctBusca');n.focus();n.setSelectionRange(pos,pos)}}
+function bind(){const pv=$('#ctProv');if(pv)pv.onchange=()=>{cfg.provisao=pv.checked;try{localStorage.setItem('eb_contab',JSON.stringify(cfg))}catch{}cache=null;render()};const a=$('#ctAcum');if(a)a.onchange=()=>{ui.acumulado=a.checked;render()};const i=$('#ctBusca');if(i)i.oninput=e=>{ui.busca=e.target.value;const pos=e.target.selectionStart;render();const n=$('#ctBusca');n.focus();n.setSelectionRange(pos,pos)}}
 addPage('contabauto','ledger','Contabilidade automática',view,'Diário, razão, balancete, DRE e balanço em partidas dobradas, gerados sozinhos a partir da operação.','',bind);
 window.Contab={diario,saldos};
 })();

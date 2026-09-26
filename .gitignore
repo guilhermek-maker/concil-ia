@@ -10,3 +10,6 @@ supabase/.temp/
 supabase/.branches/
 supabase/functions/deno.lock
 .claude/
+
+# Ambiente de teste local (cópia de dados, nunca publicar)
+web/_local/
