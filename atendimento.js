@@ -119,7 +119,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-at-f
 });
 function bind(){const i=$('#atBusca');if(i)i.oninput=e=>{st.busca=e.target.value;const pos=e.target.selectionStart;render();const n=$('#atBusca');n.focus();n.setSelectionRange(pos,pos)}}
 addPage('atendimento','headset','Atendimento',view,'Reclamações, devoluções, mediações, perguntas e mensagens numa fila só — com a solução sugerida e a resposta pronta.','',bind);
-window.Atendimento={avisos,abertos:abertosN,carregar};
+window.Atendimento={avisos,abertos:abertosN,carregar,lista:()=>st.lista};
 // Primeira leitura assim que a empresa abre; depois a cada 2 minutos (o servidor lê o marketplace a cada 10).
 let ultimoWs=null;setInterval(()=>{if(window.Cloud?.ws&&window.Cloud.ws!==ultimoWs){ultimoWs=Cloud.ws;st.carregado=false;st.lista=[];carregar(true)}},1500);
 setInterval(()=>{if(window.Cloud?.ws&&!document.hidden)carregar(true)},120000);
