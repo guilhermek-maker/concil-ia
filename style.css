@@ -348,3 +348,14 @@ tr.ctbnovo td{border-top:2px solid var(--line)}
 /* ═══ Faturamento ═══ */
 .fatchart{width:100%;height:auto;display:block}.fatchart .fb{fill:rgb(var(--ar) / 18%)}.fatchart .fn{fill:var(--accent)}.fatchart text{fill:var(--muted);font-size:11px}
 .checklist{display:grid;gap:8px;margin:10px 0}.chk{display:flex;gap:10px;align-items:flex-start}.chk small{display:block;color:var(--muted);font-size:11px}
+
+/* ═══ Vendas · Visão geral ═══ */
+.vdchart{width:100%;height:auto;display:block}.vdchart .grid{stroke:var(--line);stroke-dasharray:3 4}.vdchart text{fill:var(--muted);font-size:11px}
+.barline{display:grid;grid-template-columns:minmax(0,1.4fr) 1fr auto auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:12px}.barline:last-child{border:0}
+.bartrack{height:6px;background:var(--panel2);border-radius:4px;overflow:hidden}.bartrack i{display:block;height:100%;background:var(--accent);border-radius:4px}
+
+/* ═══ KPIs: valores grandes cabem no card ═══ */
+.kpi .kpiv{font-size:clamp(18px,1.9vw,28px);overflow-wrap:anywhere;line-height:1.15}
+/* ═══ Fluxo de caixa ═══ */
+.fxtable td,.fxtable th{padding:9px 14px}.fxsec td{font-size:10px;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);padding-top:16px;border-top:0}
+.fxg td:first-child{font-weight:600}.fxc td:first-child{padding-left:34px;color:var(--muted);font-size:12px}
