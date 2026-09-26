@@ -11,11 +11,11 @@ const PLANO=[
  ['1','ATIVO','A'],['1.1','Ativo circulante','A'],['1.1.01','Caixa e bancos','A'],['1.1.01.90','Caixa (fundo fixo)','A'],['1.1.01.99','Outras contas próprias','A'],
  ['1.1.02','Aplicações financeiras','A'],['1.1.02.99','Aplicações a identificar','A'],
  ['1.1.03','Marketplaces a receber e carteiras','A'],['1.1.03.01','Mercado Livre / Mercado Pago','A'],['1.1.03.02','Shopee','A'],['1.1.03.03','Magalu','A'],['1.1.03.09','Outros canais','A'],
- ['1.1.04','Estoque de mercadorias','A'],['1.1.09','Pagamentos por outro meio (a identificar)','A'],
+ ['1.1.04','Estoque de mercadorias','A'],['1.1.05','Clientes · vendas diretas','A'],['1.1.09','Pagamentos por outro meio (a identificar)','A'],
  ['1.2','Ativo não circulante — imobilizado','A'],['1.2.01','Veículos','A'],['1.2.02','Máquinas e equipamentos','A'],['1.2.03','Móveis e utensílios','A'],
  ['2','PASSIVO','P'],['2.1','Passivo circulante','P'],['2.1.01','Fornecedores e contas a pagar','P'],['2.1.02','Tributos sobre vendas a recolher','P'],
  ['3','PATRIMÔNIO LÍQUIDO','P'],['3.1','Capital social','P'],['3.1.01','Capital integralizado','P'],['3.9','Saldos de abertura','P'],['3.9.01','Saldos de abertura (implantação)','P'],['3.8','Resultado do período','P'],
- ['4','RECEITAS','R'],['4.1','Receita bruta de vendas','R'],['4.1.01','Vendas Mercado Livre','R'],['4.1.02','Vendas Shopee','R'],['4.1.03','Vendas Magalu','R'],['4.1.09','Vendas outros canais','R'],
+ ['4','RECEITAS','R'],['4.1','Receita bruta de vendas','R'],['4.1.01','Vendas Mercado Livre','R'],['4.1.02','Vendas Shopee','R'],['4.1.03','Vendas Magalu','R'],['4.1.04','Vendas diretas (atacado)','R'],['4.1.09','Vendas outros canais','R'],
  ['4.2','(−) Deduções da receita','R'],['4.2.01','PIS e COFINS','R'],['4.2.02','ICMS e DIFAL (GNRE/DARE)','R'],['4.2.03','Devoluções de vendas','R'],['4.2.04','Tributos sobre vendas (provisão)','R'],
  ['4.3','Receitas financeiras e outras','R'],['4.3.01','Rendimentos de aplicações','R'],['4.3.02','Outras receitas','R'],
  ['5','CUSTOS','D'],['5.1','Custo das vendas','D'],['5.1.01','Custo das mercadorias vendidas (CMV)','D'],['5.1.02','Embalagens','D'],
@@ -44,7 +44,7 @@ const contaTrib=c=>provisaoOn()&&TRIB.has(c)?'2.1.02':contaCat(c);
 let cache=null;let aliqCache=new Map();
 function contas(){const m=new Map(PLANO.map(([c,n,t])=>[c,{c,n,t}]));let i=1,j=1;
  for(const a of db.bankAccounts||[]){const cod=a.tipo==='aplicacao'?`1.1.02.${String(j++).padStart(2,'0')}`:`1.1.01.${String(i++).padStart(2,'0')}`;m.set(cod,{c:cod,n:a.nome,t:'A',banco:a.id})}return m}
-function diario(){const k=[provisaoOn(),db.gerencial?.contabil?.aliq_efetiva,JSON.stringify(db.gerencial?.contabil?.mapa||{}),db.orders.length,(db.bankTx||[]).length,(db.payables||[]).length,(db.purchases||[]).length,(db.bankAccounts||[]).length,(window.Estoque?.lista?.()||[]).length].join('|');if(cache?.k===k)return cache.v;
+function diario(){const k=[(window.VendaDireta?.vendas?.()||[]).length,(window.VendaDireta?.titulos?.()||[]).filter(r=>r.status==='recebido').length,provisaoOn(),db.gerencial?.contabil?.aliq_efetiva,JSON.stringify(db.gerencial?.contabil?.mapa||{}),db.orders.length,(db.bankTx||[]).length,(db.payables||[]).length,(db.purchases||[]).length,(db.bankAccounts||[]).length,(window.Estoque?.lista?.()||[]).length].join('|');if(cache?.k===k)return cache.v;
  const plano=contas(),banco=new Map([...plano.values()].filter(x=>x.banco).map(x=>[x.banco,x.c])),L=[];
  const lanc=(d,hist,orig,linhas)=>{linhas=linhas.filter(([,v])=>Math.abs(v)>=0.005);if(linhas.length)L.push({d,hist,orig,l:linhas})}; // l: [conta, valor>0 débito / <0 crédito]
  const par=(d,hist,orig,deb,cred,v)=>{v=Math.round(v*100)/100;if(!v)return;if(v<0){[deb,cred]=[cred,deb];v=-v}lanc(d,hist,orig,[[deb,v],[cred,-v]])};
@@ -62,6 +62,7 @@ function diario(){const k=[provisaoOn(),db.gerencial?.contabil?.aliq_efetiva,JSO
  const pagosPeloBanco=new Set();
  for(const t of db.bankTx||[]){if(t.origem==='espelho'||t.status==='ignorado')continue;const c=banco.get(t.contaId);if(!c)continue;const v=t.vinculo||{},h=`${t.descricao}`,o={tipo:'extrato',id:t.id};
   if(t.status!=='conciliado'){par(t.data,h+' (a classificar)',o,c,'9.1.01',t.valor);continue}
+  if(v.tipo==='recebivel'){par(t.data,`Recebimento · ${v.desc||h}`,o,c,'1.1.05',t.valor);continue}
   if(v.tipo==='payable'){for(const id of v.ids||[v.id])pagosPeloBanco.add(id);par(t.data,`Pagamento · ${v.desc||h}`,o,c,'2.1.01',t.valor);continue}
   if(v.tipo==='aplicacao'){par(t.data,`${t.valor<0?'Aplicação':'Resgate'} · ${h}`,o,c,aplicDe(t),t.valor);continue}
   if(v.tipo==='transferencia'){const d=normalized((v.desc||'')+' '+h);const outra=/mercado pago|wolfach/.test(d)?'1.1.03.01':/shopee|maree/.test(d)?'1.1.03.02':/magalu/.test(d)?'1.1.03.03':/saque|caixa/.test(d)?'1.1.01.90':'1.1.01.99';par(t.data,v.desc||h,o,c,outra,t.valor);continue}
@@ -87,6 +88,9 @@ function diario(){const k=[provisaoOn(),db.gerencial?.contabil?.aliq_efetiva,JSO
   if(cmv)par(o.date,`CMV · pedido ${o.id}`,orig,'5.1.01','1.1.04',cmv)}
  if(provisaoOn()){const rec=new Map();for(const o of db.orders){const m=o.date.slice(0,7);rec.set(m,(rec.get(m)||0)+o.gross)}const meses=[...rec.keys()].sort();aliqCache=aliquotas(meses);const fixa=Number(db.gerencial?.contabil?.aliq_efetiva);if(fixa>0)for(const m of meses)aliqCache.set(m,{r:fixa/100,m,fonte:'parametrização'});
   for(const m of meses){const a=aliqCache.get(m);if(!a)continue;par(fim(m),`Tributos sobre vendas de ${m.slice(5)}/${m.slice(0,4)} · ${(a.r*100).toFixed(1).replace('.',',')}% (${a.fonte==='balancete'?'balancete do escritório':'alíquota de '+a.m.slice(5)+'/'+a.m.slice(0,4)})`,{tipo:'provisao',id:m},'4.2.04','2.1.02',rec.get(m)*a.r)}}
+ // Vendas diretas faturadas: receita contra clientes (pelas parcelas) e CMV pelos itens.
+ for(const vd of window.VendaDireta?.vendas?.()||[]){if(vd.status!=='faturado'||!vd.emissao)continue;const o={tipo:'venda_direta',id:vd.id};par(vd.emissao,`Venda direta nº ${vd.numero} · ${vd.cliente?.fantasia||vd.cliente?.nome||''}`,o,'1.1.05','4.1.04',Number(vd.total)||0);
+  let cmvVd=0;for(const it of vd.itens||[])cmvVd+=(custo.get(String(it.sku||'').trim())||0)*(Number(it.qtd)||0);if(cmvVd)par(vd.emissao,`CMV · venda direta nº ${vd.numero}`,o,'5.1.01','1.1.04',cmvVd)}
  L.sort((a,b)=>a.d.localeCompare(b.d));cache={k,v:{L,plano,semCusto}};return cache.v}
 
 // ─────────────── Saldos ───────────────
