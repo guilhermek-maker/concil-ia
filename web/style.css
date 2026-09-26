@@ -365,3 +365,10 @@ tr.ctbnovo td{border-top:2px solid var(--line)}
 .pdcard{display:flex;flex-direction:column;align-items:stretch;gap:8px;text-align:left;padding:18px;transform:none}.pdcard:hover{transform:none;border-color:rgb(var(--ar) / 55%)}
 .pdcard.ok{opacity:.72}.pdhead{display:flex;align-items:center;gap:10px}.pdhead strong{flex:1}.pdn{font-size:24px;font-weight:700}
 .pdfoot{display:flex;justify-content:space-between;gap:8px;font-weight:600}.pdacao{color:var(--accent);font-size:12px;font-weight:600}
+
+/* ═══ CRM: fases da criança, linha do tempo e réguas ═══ */
+.fasebox{border:1px solid rgb(var(--ar) / 30%);background:rgb(var(--ar) / 6%);border-radius:12px;padding:12px 14px;margin-top:14px}.fasebox p{margin:6px 0 0}
+.fasehead{display:flex;gap:10px;align-items:center}.fasehead .icon{color:var(--accent);width:26px;height:26px}.fasehead small{display:block;color:var(--muted);font-size:11px}
+.tl360{max-height:240px;overflow:auto}.tl360 .event{padding-bottom:14px}
+.reguas{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}.regua textarea{min-height:76px}
+.switch{display:inline-flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:12px;color:var(--text)}.switch input{accent-color:var(--accent);width:18px;height:18px}

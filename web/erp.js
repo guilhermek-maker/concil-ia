@@ -22,7 +22,7 @@ const MODS=[
  {id:'ven',ic:'link',t:'Vendas',grupos:[['Acompanhar',['dashboard','faturamento','reconcile','pending','closing']],['Pós-venda',['atendimento']],['Conexões',['integracoes']]]},
  {id:'est',ic:'box',t:'Estoque',grupos:[['Estoque',['estoque','estcompras']]]},
  {id:'fin',ic:'wallet',t:'Financeiro',grupos:[['A pagar',['pagar','compras']],['Bancos',['tesouraria','concbanco']],['Caixa',['fluxo']]]},
- {id:'crm',ic:'heart',t:'CRM',grupos:[['CRM',['crm','crmclientes','crmprodutos','crmgeo','crmacoes']]]},
+ {id:'crm',ic:'heart',t:'CRM',grupos:[['CRM',['crm','crmclientes','crmfases','crmacoes']],['Análises',['crmprodutos','crmgeo']],['Automação',['crmreguas']]]},
  {id:'cad',ic:'folder',t:'Cadastros',grupos:[['Parceiros',['fornecedores']],['Financeiro',['cadcontas','categorias','centros']],['Produtos',['cadprodutos']]]},
  {id:'res',ic:'chart',t:'Resultado',grupos:[['Contabilidade',['contabauto','contabil']]]},
  {id:'pre',ic:'tag',t:'Preços',grupos:[['Formação de preço',['precos']]]},
