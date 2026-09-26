@@ -331,3 +331,11 @@ body.light.tema-rose{--accent:#c23f7f;--ar:194 63 127;--ar2:194 63 127;--btn:#c2
 /* ═══ Auditoria ═══ */
 .clickrow{cursor:pointer}.clickrow:hover td{background:rgb(var(--ar) / 5%)}
 .audres{white-space:normal;min-width:260px;max-width:520px;color:var(--muted);font-size:12px}
+
+/* ═══ Estoque ═══ */
+.esttable td{vertical-align:middle}
+.estprod{display:flex;align-items:center;gap:10px;min-width:240px;white-space:normal}.estprod img,.estimg{width:38px;height:38px;border-radius:8px;object-fit:cover;background:var(--panel2);flex:none;display:grid;place-items:center;color:var(--muted)}
+.spark{width:84px;height:22px;display:block}.spark polyline{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round}
+.estficha{display:flex;gap:16px;align-items:flex-start}.estficha img{width:96px;height:96px;border-radius:12px;object-fit:cover;flex:none;background:var(--panel2)}.estficha>div{flex:1;min-width:0}
+.estficha .minis{margin-top:10px}
+@media(max-width:620px){.estficha{flex-direction:column}}
