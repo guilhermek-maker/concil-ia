@@ -67,7 +67,7 @@ const REGRAS=[[/mercado\s?pago|mercadopago/,'transferencia','Mercado Pago'],[/sh
 // ─────────────── Regras aprendidas ───────────────
 // A equipe classifica um movimento uma vez e marca "lembrar": os próximos com o mesmo padrão de descrição
 // (e o mesmo sentido, entrada ou saída) já chegam com a classificação exata. As regras ficam em Cadastros.
-const GENERICAS=new Set(['pix','ted','doc','tev','transf','transferencia','recebido','recebida','enviado','enviada','pagamento','pagto','pag','boleto','sispag','debito','credito','conta','int','ltda','eireli','comercio','servicos','industria','de','da','do','das','dos','e','para','via','sa','me','epp','cnpj','cpf','qr','code','qrcode','codigo']);
+const GENERICAS=new Set(['pagamentos','pago','paga','online','pix','ted','doc','tev','transf','transferencia','recebido','recebida','enviado','enviada','pagamento','pagto','pag','boleto','sispag','debito','credito','conta','int','ltda','eireli','comercio','servicos','industria','de','da','do','das','dos','e','para','via','sa','me','epp','cnpj','cpf','qr','code','qrcode','codigo']);
 const tokens=s=>normalized(s).replace(/[0-9]+/g,' ').split(/[^a-z]+/).filter(w=>w.length>=3&&!GENERICAS.has(w));
 const padraoDe=desc=>[...new Set(tokens(desc))].slice(0,3).join(' ');
 const regras=()=>(db.cadastros||[]).filter(c=>c.tipo==='regra'&&c.ativo!==false);
@@ -79,7 +79,7 @@ function salvarRegra(t,dados){const padrao=padraoDe(dados.padrao||t.descricao);i
  if(ja){Object.assign(ja.dados,d);return ja}const r={id:'reg-'+uid(),tipo:'regra',ativo:true,dados:d};(db.cadastros||(db.cadastros=[])).push(r);audit('Regra de conciliação criada',`"${padrao}" (${sentido}) → ${d.tipo}${d.categoria?' · '+d.categoria:''}${d.destino?' · '+d.destino:''}`);return r}
 // Descobre regras no histórico: padrões que a equipe sempre classificou do mesmo jeito (3 vezes ou mais).
 function descobrirRegras(){const grupos=new Map();
- for(const t of T().filter(x=>x.status==='conciliado'&&x.vinculo&&['despesa','receita','transferencia','aplicacao'].includes(x.vinculo.tipo))){const padrao=padraoDe(t.descricao);if(!padrao)continue;const sentido=t.valor<0?'saida':'entrada',v=t.vinculo;
+ for(const t of T().filter(x=>x.status==='conciliado'&&x.origem!=='espelho'&&x.vinculo&&['despesa','receita','transferencia','aplicacao'].includes(x.vinculo.tipo))){const padrao=padraoDe(t.descricao);if(!padrao)continue;const sentido=t.valor<0?'saida':'entrada',v=t.vinculo;
   const p=v.tipo==='despesa'?(db.payables||[]).find(x=>x.id===v.id):null;const destino=v.tipo==='transferencia'?String(v.desc||'').replace(/^Transferência (de|para) /,''):'';
   const chave=`${padrao}|${sentido}`,cls=JSON.stringify([v.tipo,v.categoria||'',destino]);const g=grupos.get(chave)||{padrao,sentido,cls:new Map(),exemplo:t.descricao,fornecedor:''};g.cls.set(cls,(g.cls.get(cls)||0)+1);if(p?.fornecedor&&p.fornecedor!==t.descricao)g.fornecedor=p.fornecedor;grupos.set(chave,g)}
  const out=[];for(const g of grupos.values()){if(g.cls.size!==1)continue;const [[cls,n]]=[...g.cls];if(n<3)continue;if(regras().some(r=>r.dados.padrao===g.padrao&&r.dados.sentido===g.sentido))continue;const [tipo,categoria,destino]=JSON.parse(cls);out.push({padrao:g.padrao,sentido:g.sentido,tipo,categoria,destino,fornecedor:g.fornecedor,exemplo:g.exemplo,n})}
