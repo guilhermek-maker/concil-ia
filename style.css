@@ -393,3 +393,6 @@ tr.muted td{opacity:.6}
 
 /* ═══ Segurança ═══ */
 .segqr{display:flex;gap:16px;align-items:flex-start;margin-top:12px;flex-wrap:wrap}.segqr img{background:#fff;border-radius:10px;padding:8px}
+
+/* ═══ Radar de margem ═══ */
+.mgbar{display:inline-block;width:80px;height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;vertical-align:middle}.mgbar i{display:block;height:100%;background:var(--green)}.mgbar i.low{background:var(--gold)}.mgbar i.neg{background:var(--red)}
