@@ -5,6 +5,8 @@
 import { admin, authorize, env, handler, HttpError, json, signState } from "../_shared/common.ts";
 import { persist, provider, providers, validSecret } from "../_shared/store.ts";
 import { importShopeeIncome } from "../_shared/shopee_central.ts";
+import { responderML, sincronizarAtendimentoML } from "../_shared/atendimento_ml.ts";
+import { sugerirAtendimento } from "../_shared/atendimento_ia.ts";
 
 const required: Record<string, string[]> = {
   bling: ["BLING_CLIENT_ID", "BLING_CLIENT_SECRET"],
@@ -15,6 +17,7 @@ const required: Record<string, string[]> = {
 const BUDGET_MS = 110_000; // Edge Functions encerram em ~150 s; paramos antes e gravamos o cursor.
 const LOCK_MS = 140_000;
 const HOURLY_MS = 60 * 60_000;
+const ATENDIMENTO_MS = 10 * 60_000; // reclamações, perguntas e mensagens: a cada 10 minutos
 
 type Db = ReturnType<typeof admin>;
 interface Job { from: string; to: string; fases?: string[]; cursor: unknown; locked_until?: number | null; started_at?: string; saved?: Record<string, number> }
@@ -133,6 +136,14 @@ Deno.serve(handler(async (req) => {
         report.push({ workspace_id: i.workspace_id, compras: r });
       } catch (e) { report.push({ workspace_id: i.workspace_id, compras_erro: String(e) }); }
     }
+    // Atendimento pós-venda (Mercado Livre): fila de reclamações, devoluções, perguntas e mensagens.
+    for (const i of list.filter((x) => x.provider === "mercadolivre" && (!x.settings?.atendimento?.fim || Date.now() - new Date(x.settings.atendimento.fim).getTime() > ATENDIMENTO_MS))) {
+      try {
+        const r = await sincronizarAtendimentoML(db, i.workspace_id);
+        await writeSettings(db, i.workspace_id, i.provider, (s) => { s.atendimento = { ...r, fim: new Date().toISOString() }; });
+        report.push({ workspace_id: i.workspace_id, atendimento: r });
+      } catch (e) { report.push({ workspace_id: i.workspace_id, atendimento_erro: String(e) }); }
+    }
     for (const [n, i] of list.entries()) {
       if (Date.now() > deadline - 15_000) break;
       const slot = Math.min(deadline, Date.now() + (deadline - Date.now()) / (list.length - n));
@@ -169,7 +180,7 @@ Deno.serve(handler(async (req) => {
   }
 
   const ws = String(body.workspace_id ?? "");
-  const { db } = await authorize(req, ws);
+  const { db, user } = await authorize(req, ws);
 
   switch (action) {
     case "cnpj": {
@@ -199,6 +210,22 @@ Deno.serve(handler(async (req) => {
         socios: (c.members ?? []).map((m: any) => `${m.person?.name ?? ""}${m.role?.text ? " · " + m.role.text : ""}`).join("\n"),
         suframa: o.suframa?.[0]?.number ?? "", receitaEm: new Date().toISOString().slice(0, 10),
       });
+    }
+    case "atendimento_sync": {
+      const r = await sincronizarAtendimentoML(db, ws);
+      await writeSettings(db, ws, "mercadolivre", (s) => { s.atendimento = { ...r, fim: new Date().toISOString() }; });
+      return json(r);
+    }
+    case "atendimento_responder": {
+      const id = String(body.id ?? "");
+      if (!id.startsWith("ML-")) throw new HttpError(400, "Por enquanto só respondo atendimentos do Mercado Livre.");
+      const r = await responderML(db, ws, id, String(body.texto ?? ""));
+      await db.from("audit_log").insert({ workspace_id: ws, id: crypto.randomUUID(), action: "Resposta enviada ao cliente", detail: `${id} · ${String(body.texto ?? "").slice(0, 300)}`, actor: user.email ?? user.id });
+      return json(r);
+    }
+    case "atendimento_ia": {
+      if (!Deno.env.get("ANTHROPIC_API_KEY")) throw new HttpError(400, "A chave da IA não está configurada no servidor.");
+      return json(await sugerirAtendimento(db, ws, user.id, String(body.id ?? "")));
     }
     case "status": {
       const available = Object.fromEntries(Object.keys(providers).map((k) => [k, required[k].every((n) => Deno.env.get(n))]));
