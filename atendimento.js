@@ -43,7 +43,7 @@ async function carregar(silencioso){if(!window.Cloud?.ws||st.carregando)return;s
    Cloud.client.from('integrations').select('settings,status').eq('workspace_id',Cloud.ws).eq('provider','mercadolivre').maybeSingle()]);
   if(error)throw error;const antes=new Set(st.lista.map(a=>a.id));st.lista=data||[];st.info=integ.data?.settings?.atendimento||null;st.mlConectado=integ.data?.status==='conectado';st.erro='';
   if(st.carregado)avisarNovos(st.lista.filter(a=>aberto(a)&&!antes.has(a.id)));st.carregado=true}
- catch(e){st.erro=e.message||String(e)}finally{st.carregando=false}
+ catch(e){st.erro=e.message||String(e);st.carregado=true}finally{st.carregando=false}
  if(page==='atendimento'){if(!silencioso||!document.querySelector('.modalback'))render()}else atualizarContadores()}
 function atualizarContadores(){const n=abertosN();document.querySelectorAll('[data-nav="atendimento"] .navcount').forEach(x=>x.remove());if(n)document.querySelectorAll('[data-nav="atendimento"]').forEach(b=>b.insertAdjacentHTML('beforeend',`<em class="navcount">${n}</em>`))}
 function avisarNovos(l){if(!l.length)return;toast(`${l.length} novo(s) atendimento(s): ${l.slice(0,2).map(a=>TIPOS[a.tipo]?.[0]||a.tipo).join(', ')}`);
