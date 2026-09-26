@@ -8,6 +8,17 @@ const pid = () => Number(env("SHOPEE_PARTNER_ID"));
 const now = () => Math.floor(Date.now() / 1000);
 const DAY = 86400;
 
+// A Shopee só aceita chamadas de IPs cadastrados: com SHOPEE_PROXY_URL definido, tudo passa pelo
+// repasse de IP fixo (ops/shopee-proxy), assinado com SHOPEE_PROXY_SECRET.
+async function shopeeFetch(url: string, init: RequestInit = {}) {
+  const proxy = Deno.env.get("SHOPEE_PROXY_URL");
+  if (!proxy) return fetchJson(url, init);
+  const alvo = new URL(url).href, ts = String(Date.now()), metodo = init.method || "GET";
+  const corpo = typeof init.body === "string" ? init.body : "";
+  const assinatura = await hmacHex(env("SHOPEE_PROXY_SECRET"), `${ts}\n${metodo}\n${alvo}\n${corpo}`);
+  return fetchJson(proxy, { ...init, method: metodo, headers: { ...(init.headers as Record<string, string> ?? {}), "x-alvo": alvo, "x-ts": ts, "x-assinatura": assinatura } });
+}
+
 async function signed(path: string, extra = "") {
   const ts = now();
   const sign = await hmacHex(env("SHOPEE_PARTNER_KEY"), `${pid()}${path}${ts}${extra}`);
@@ -20,14 +31,14 @@ async function shopGet(ctx: SyncContext, path: string, params: Record<string, st
   const q = await signed(path, `${ctx.token}${shop}`);
   q.set("access_token", ctx.token); q.set("shop_id", shop);
   for (const [k, v] of Object.entries(params)) q.set(k, v);
-  const r = await fetchJson(`${HOST()}${path}?${q}`);
+  const r = await shopeeFetch(`${HOST()}${path}?${q}`);
   if (r?.error) throw new Error(`Shopee ${path}: ${r.error} ${r.message ?? ""}`);
   return r?.response ?? {};
 }
 
 async function tokenCall(path: string, body: Record<string, unknown>) {
   const q = await signed(path);
-  const r = await fetchJson(`${HOST()}${path}?${q}`, {
+  const r = await shopeeFetch(`${HOST()}${path}?${q}`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, partner_id: pid() }),
   });
   if (r?.error) throw new Error(`Shopee: ${r.error} ${r.message ?? ""}`);

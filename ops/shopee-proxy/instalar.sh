@@ -43,9 +43,9 @@ ${HOST} {
 }
 EOF
 
-# Firewall do Ubuntu da Oracle: libera 80/443 (o 22 já vem liberado).
-iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+# Firewall do Ubuntu da Oracle: libera 80/443 antes da regra REJECT (posição 5; o 22 já vem liberado).
+iptables -I INPUT 5 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+iptables -I INPUT 5 -m state --state NEW -p tcp --dport 443 -j ACCEPT
 netfilter-persistent save || true
 
 systemctl daemon-reload
