@@ -50,7 +50,7 @@ shell=function(){const pm=modDe(page);if(pm)modAtual=pm;if(page!==paginaAnterior
  const meses=[...new Set([month,...db.orders.map(o=>o.date.slice(0,7)),...P().map(t=>t.vencimento.slice(0,7))])].filter(m=>m>='2020').sort().reverse().slice(0,36);
  const emp=esc(window.Cloud?.wsName||'Minha empresa');
  $('#app').innerHTML=`<div class="erp">
- <aside class="side"><button class="sidebrand" data-nav="central" aria-label="Início"><span class="logotile"><img src="brand/comprastore.png" alt=""></span><span><strong>${emp}</strong><small>EcomBalance · ERP</small></span></button>
+ <aside class="side"><button class="sidebrand" data-nav="central" aria-label="Início"><img class="sidelogo" src="brand/comprastore-logo-240.png" alt=""><span><strong>${emp}</strong><small>EcomBalance · ERP</small></span></button>
   <nav class="menu" aria-label="Menu principal">${MODS.map(m=>{const ids=m.grupos.flatMap(([,l])=>l).filter(id=>navItems.some(n=>n[0]===id)),unico=ids.length===1&&!m.plataformas,ativo=m.id===M.id,aberto=(menuSel??M.id)===m.id;
    if(unico)return `<button class="mhead ${page===ids[0]?'active':''}" data-nav="${ids[0]}">${ico(m.ic,20)}<span>${m.t}</span></button>`;
    return `<div class="mgroup ${aberto?'open':''} ${ativo?'cur':''}"><button class="mhead" data-mtoggle="${m.id}" aria-expanded="${aberto}">${ico(m.ic,20)}<span>${m.t}</span>${ico('chev',15)}</button>${aberto?`<div class="mitems">${ids.map(item).join('')}${m.plataformas?Object.keys(platforms).map(p=>`<button data-nav="${p}" class="${page===p?'active':''}"><span class="platdot" style="background:${platforms[p].color}"></span><span>${p}</span></button>`).join(''):''}</div>`:''}</div>`}).join('')}</nav></aside>
