@@ -158,9 +158,20 @@ async function aguardandoView(session){const {data:req}=await sb.from('access_re
  <div class="row wrap" style="margin-top:20px">${recusado?'':'<button class="primary" id="accCheck">Verificar agora</button>'}<button class="quiet" id="accOut">Sair</button></div></div></div>`;
  const c=$('#accCheck');if(c)c.onclick=()=>start(session);$('#accOut').onclick=async()=>{await sb.auth.signOut()}}
 
+// Verificação em duas etapas: com autenticador cadastrado, os dados só abrem depois do código (o banco exige aal2).
+function pedirCodigo(session){return new Promise(res=>{
+ $('#app').innerHTML=`<div class="auth"><div class="authcard"><h2>Verificação em duas etapas</h2><p class="caption">Abra o app autenticador (Google Authenticator, Microsoft Authenticator, 1Password…) e digite o código de 6 dígitos do EcomBalance.</p>
+  <label for="mfaCod">Código</label><input id="mfaCod" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="width:100%;font-size:22px;letter-spacing:6px;text-align:center" autofocus>
+  <p class="caption red" id="mfaErro"></p><div class="row" style="margin-top:12px"><button class="primary" id="mfaOk">Entrar</button><button class="quiet" id="mfaSair">Sair</button></div></div></div>`;
+ const ir=async()=>{const code=$('#mfaCod').value.replace(/D/g,'');if(code.length!==6){$('#mfaErro').textContent='Digite os 6 dígitos.';return}
+  const {data:f}=await sb.auth.mfa.listFactors();const fator=(f?.totp||[]).find(x=>x.status==='verified');if(!fator){res(session);return}
+  const {error}=await sb.auth.mfa.challengeAndVerify({factorId:fator.id,code});if(error){$('#mfaErro').textContent='Código inválido ou expirado. Tente o próximo.';$('#mfaCod').value='';return}
+  const {data:s2}=await sb.auth.getSession();res(s2.session)};
+ $('#mfaOk').onclick=ir;$('#mfaCod').onkeydown=e=>{if(e.key==='Enter')ir()};$('#mfaSair').onclick=()=>sb.auth.signOut();setTimeout(()=>$('#mfaCod')?.focus(),50)})}
 async function start(session){
  Cloud.session=session;
  if(!session){Cloud.ws=null;loginView();return}
+ try{const {data:aal}=await sb.auth.mfa.getAuthenticatorAssuranceLevel();if(aal?.nextLevel==='aal2'&&aal.currentLevel!=='aal2'){session=await pedirCodigo(session);Cloud.session=session}}catch{}
  try{
   $('#app').innerHTML='<div class="auth"><div class="authcard"><p>Carregando seus dados…</p></div></div>';
   const {data:ws,error}=await sb.rpc('ensure_workspace');if(error)throw error;
