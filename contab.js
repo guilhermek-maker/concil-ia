@@ -28,7 +28,7 @@ const CAT={'Compra de mercadorias':'1.1.04','Embalagens':'5.1.02','ICMS DIFAL / 
  'Aluguel':'6.3.01','Pró-labore':'6.2.02','Salários e encargos':'6.2.01','Contabilidade':'6.3.03','Serviços de terceiros':'6.3.04','Material de uso e consumo':'6.3.05','Sistemas e softwares':'6.3.06','Água, luz e internet':'6.3.02','Seguros':'6.3.07',
  'Reembolso de despesas':'6.3.08','Tarifas bancárias':'6.5.01','Empréstimos e juros':'6.5.02','Fretes e logística':'6.1.02','Marketing e anúncios':'6.1.03','Tarifas de marketplace':'6.1.01','Outras despesas':'6.9.01',
  'Aporte de capital':'3.1.01','Aporte de sócios':'3.1.01','Outras receitas':'4.3.02','Rendimentos de aplicações':'4.3.01','Estorno / devolução':'4.3.02','Empréstimo recebido':'2.1.01'};
-const contaCat=c=>CAT[c]||(/icms|difal|gnre/i.test(c||'')?'4.2.02':/tarifa/i.test(c||'')?'6.1.01':/frete/i.test(c||'')?'6.1.02':'6.9.01');
+const contaCat=c=>db.gerencial?.contabil?.mapa?.[c]||CAT[c]||(/icms|difal|gnre/i.test(c||'')?'4.2.02':/tarifa/i.test(c||'')?'6.1.01':/frete/i.test(c||'')?'6.1.02':'6.9.01');
 const PLAT={'Mercado Livre':'01','Shopee':'02','Magalu':'03'};const pl=p=>PLAT[p]||'09';
 
 // ─────────────── Tributos sobre vendas (competência) ───────────────
@@ -37,13 +37,14 @@ const PLAT={'Mercado Livre':'01','Shopee':'02','Magalu':'03'};const pl=p=>PLAT[p
 const cfg={provisao:true};try{Object.assign(cfg,JSON.parse(localStorage.getItem('eb_contab')||'{}'))}catch{}
 function aliquotas(meses){const out=new Map();let ult=null;for(const m of meses){let r=null;try{const d=window.Gestao?.dreMes?.(m);if(d?.fonte==='balancete'&&d.v?.receita>0)r=-(d.v.impostos||0)/d.v.receita}catch{}if(r!=null&&r>0&&r<0.6){ult={r,m,fonte:'balancete'};out.set(m,ult)}else if(ult)out.set(m,{r:ult.r,m:ult.m,fonte:'estimada'})}return out}
 const TRIB=new Set(['ICMS DIFAL / GNRE','PIS e COFINS']);
-const contaTrib=c=>cfg.provisao&&TRIB.has(c)?'2.1.02':contaCat(c);
+const provisaoOn=()=>db.gerencial?.contabil?.provisao??cfg.provisao;
+const contaTrib=c=>provisaoOn()&&TRIB.has(c)?'2.1.02':contaCat(c);
 
 // ─────────────── Geração do diário ───────────────
 let cache=null;let aliqCache=new Map();
 function contas(){const m=new Map(PLANO.map(([c,n,t])=>[c,{c,n,t}]));let i=1,j=1;
  for(const a of db.bankAccounts||[]){const cod=a.tipo==='aplicacao'?`1.1.02.${String(j++).padStart(2,'0')}`:`1.1.01.${String(i++).padStart(2,'0')}`;m.set(cod,{c:cod,n:a.nome,t:'A',banco:a.id})}return m}
-function diario(){const k=[cfg.provisao,db.orders.length,(db.bankTx||[]).length,(db.payables||[]).length,(db.purchases||[]).length,(db.bankAccounts||[]).length,(window.Estoque?.lista?.()||[]).length].join('|');if(cache?.k===k)return cache.v;
+function diario(){const k=[provisaoOn(),db.gerencial?.contabil?.aliq_efetiva,JSON.stringify(db.gerencial?.contabil?.mapa||{}),db.orders.length,(db.bankTx||[]).length,(db.payables||[]).length,(db.purchases||[]).length,(db.bankAccounts||[]).length,(window.Estoque?.lista?.()||[]).length].join('|');if(cache?.k===k)return cache.v;
  const plano=contas(),banco=new Map([...plano.values()].filter(x=>x.banco).map(x=>[x.banco,x.c])),L=[];
  const lanc=(d,hist,orig,linhas)=>{linhas=linhas.filter(([,v])=>Math.abs(v)>=0.005);if(linhas.length)L.push({d,hist,orig,l:linhas})}; // l: [conta, valor>0 débito / <0 crédito]
  const par=(d,hist,orig,deb,cred,v)=>{v=Math.round(v*100)/100;if(!v)return;if(v<0){[deb,cred]=[cred,deb];v=-v}lanc(d,hist,orig,[[deb,v],[cred,-v]])};
@@ -84,7 +85,7 @@ function diario(){const k=[cfg.provisao,db.orders.length,(db.bankTx||[]).length,
   lanc(o.date,`Venda ${o.platform} · pedido ${o.id}`,orig,linhas);
   let cmv=0;for(const it of o.items||[]){const c=custo.get(String(it.sku||'').trim());if(c)cmv+=c*(Number(it.qty)||0);else semCusto++}
   if(cmv)par(o.date,`CMV · pedido ${o.id}`,orig,'5.1.01','1.1.04',cmv)}
- if(cfg.provisao){const rec=new Map();for(const o of db.orders){const m=o.date.slice(0,7);rec.set(m,(rec.get(m)||0)+o.gross)}const meses=[...rec.keys()].sort();aliqCache=aliquotas(meses);
+ if(provisaoOn()){const rec=new Map();for(const o of db.orders){const m=o.date.slice(0,7);rec.set(m,(rec.get(m)||0)+o.gross)}const meses=[...rec.keys()].sort();aliqCache=aliquotas(meses);const fixa=Number(db.gerencial?.contabil?.aliq_efetiva);if(fixa>0)for(const m of meses)aliqCache.set(m,{r:fixa/100,m,fonte:'parametrização'});
   for(const m of meses){const a=aliqCache.get(m);if(!a)continue;par(fim(m),`Tributos sobre vendas de ${m.slice(5)}/${m.slice(0,4)} · ${(a.r*100).toFixed(1).replace('.',',')}% (${a.fonte==='balancete'?'balancete do escritório':'alíquota de '+a.m.slice(5)+'/'+a.m.slice(0,4)})`,{tipo:'provisao',id:m},'4.2.04','2.1.02',rec.get(m)*a.r)}}
  L.sort((a,b)=>a.d.localeCompare(b.d));cache={k,v:{L,plano,semCusto}};return cache.v}
 
@@ -168,5 +169,5 @@ function csv(tipo){const {ini,fim:f}=periodo();let cab,linhas;
 document.addEventListener('click',e=>{const b=e.target.closest('[data-ct-aba],[data-ct-conta],[data-ct-csv]');if(!b)return;const d=b.dataset;if(d.ctAba){ui.aba=d.ctAba;render()}if(d.ctConta)razao(d.ctConta);if(d.ctCsv)csv(d.ctCsv)});
 function bind(){const pv=$('#ctProv');if(pv)pv.onchange=()=>{cfg.provisao=pv.checked;try{localStorage.setItem('eb_contab',JSON.stringify(cfg))}catch{}cache=null;render()};const a=$('#ctAcum');if(a)a.onchange=()=>{ui.acumulado=a.checked;render()};const i=$('#ctBusca');if(i)i.oninput=e=>{ui.busca=e.target.value;const pos=e.target.selectionStart;render();const n=$('#ctBusca');n.focus();n.setSelectionRange(pos,pos)}}
 addPage('contabauto','ledger','Contabilidade automática',view,'Diário, razão, balancete, DRE e balanço em partidas dobradas, gerados sozinhos a partir da operação.','',bind);
-window.Contab={diario,saldos};
+window.Contab={diario,saldos,plano:()=>[...contas().values()],mapaCategorias:()=>({...CAT})};
 })();
