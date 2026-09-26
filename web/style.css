@@ -339,3 +339,8 @@ body.light.tema-rose{--accent:#c23f7f;--ar:194 63 127;--ar2:194 63 127;--btn:#c2
 .estficha{display:flex;gap:16px;align-items:flex-start}.estficha img{width:96px;height:96px;border-radius:12px;object-fit:cover;flex:none;background:var(--panel2)}.estficha>div{flex:1;min-width:0}
 .estficha .minis{margin-top:10px}
 @media(max-width:620px){.estficha{flex-direction:column}}
+
+/* ═══ Contabilidade automática ═══ */
+.ctb td{padding:9px 16px}.ctb .n2 td:first-child{padding-left:28px}.ctb .n3 td:first-child{padding-left:44px}.ctb .n4 td:first-child{padding-left:60px}
+.ctbgrupo td{font-weight:650;background:var(--panel2)}.ctbfinal td{border-top:2px solid var(--accent);font-size:14px}
+tr.ctbnovo td{border-top:2px solid var(--line)}

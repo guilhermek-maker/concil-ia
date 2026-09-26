@@ -117,7 +117,7 @@ function bind(){const i=$('#estBusca');if(i)i.oninput=e=>{st.busca=e.target.valu
 addPage('estoque','box','Posição de estoque',posicaoView,'Saldo, ritmo de venda, cobertura em dias, ruptura, excesso e parado — produto a produto.','',bind);
 addPage('estcompras','cart','Sugestão de compras',comprasView,'O que comprar, quanto e de quem — calculado pelo ritmo de venda e pelo prazo de reposição.','',bind);
 // Avisos: ruptura no sino e na Central do dia.
-window.Estoque={carregar,avisos:()=>{if(!st.carregado)return [];const {linhas}=base(),r=linhas.filter(l=>l.status==='ruptura'),c=linhas.filter(l=>l.status==='comprar');const out=[];
+window.Estoque={carregar,lista:()=>st.lista,avisos:()=>{if(!st.carregado)return [];const {linhas}=base(),r=linhas.filter(l=>l.status==='ruptura'),c=linhas.filter(l=>l.status==='comprar');const out=[];
  if(r.length)out.push(['bad','box',`${r.length} produto(s) em ruptura`,'Vendendo sem saldo — reponha','estoque']);if(c.length)out.push(['warn','cart',`${c.length} produto(s) para comprar`,'Abaixo do ponto de pedido','estcompras']);return out}};
 let ultimoWs=null;setInterval(()=>{if(window.Cloud?.ws&&Cloud.ws!==ultimoWs&&db.orders?.length){ultimoWs=Cloud.ws;st.carregado=false;carregar()}},2000);
 })();
