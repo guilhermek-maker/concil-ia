@@ -1,0 +1,66 @@
+'use strict';
+// Aparência (temas de cor + modo claro/escuro, por usuário) e Log e auditoria (trilha completa gravada
+// pelo banco: cada inclusão, alteração e exclusão, com quem fez, quando e o antes/depois).
+(()=>{
+// ─────────────── Aparência ───────────────
+const TEMAS=[['violeta','Violeta','#a88aff','#7550d4','Roxo original do EcomBalance'],['aqua','Verde-água','#3dd6c3','#0f8f80','Combina com a logo da Compra Store'],['grafite','Grafite','#c3cad6','#3d434d','Neutro e sóbrio, cinza chumbo'],['oceano','Oceano','#5aa9ff','#1f6fd1','Azul profundo, cara de ERP clássico'],['esmeralda','Esmeralda','#4ade80','#15803d','Verde vivo, foco em resultado'],['coral','Coral','#ff8a73','#d4533b','Quente e acolhedor'],['ambar','Âmbar','#f2b544','#a86d00','Dourado, alto contraste'],['rose','Rosé','#f47fb4','#c23f7f','Suave e moderno']];
+const ler=k=>{try{return localStorage.getItem(k)}catch{return null}};
+function temaAtual(){return window.Cloud?.session?.user?.user_metadata?.tema||ler('eb_tema')||'violeta'}
+function aplicar(t){t=TEMAS.some(x=>x[0]===t)?t:'violeta';for(const [id] of TEMAS)document.body.classList.toggle('tema-'+id,id===t&&id!=='violeta');document.querySelector('meta[name=theme-color]')?.setAttribute('content',getComputedStyle(document.body).getPropertyValue('--bg').trim()||'#090c13')}
+aplicar(ler('eb_tema'));
+let temaSessao=null;setInterval(()=>{const t=temaAtual();if(t!==temaSessao){temaSessao=t;aplicar(t)}},1000);
+async function escolher(t){try{localStorage.setItem('eb_tema',t)}catch{}aplicar(t);temaSessao=t;
+ if(window.Cloud?.client&&Cloud.session){const {data}=await Cloud.client.auth.updateUser({data:{tema:t}}).catch(()=>({}));if(data?.user)Cloud.session.user=data.user}}
+function aparencia(){const t=temaAtual(),claro=db.theme==='light';
+ modal('Aparência',`<p class="caption" style="margin-top:-10px">O tema vale para o seu usuário, em qualquer computador. O modo claro/escuro vale para a empresa.</p>
+ <div class="temagrid">${TEMAS.map(([id,nome,esc1,cla,desc])=>`<button class="temacard ${t===id?'on':''}" data-tema="${id}"><span class="temaprev" style="--c1:${esc1};--c2:${cla}"><i></i><i></i><i></i></span><strong>${nome}</strong><small>${desc}</small></button>`).join('')}</div>
+ <div class="navlabel" style="margin:18px 0 8px">Modo</div><div class="segtabs"><button class="${claro?'':'active'}" data-modo="dark">${icon('moon')} Escuro</button><button class="${claro?'active':''}" data-modo="light">${icon('sun')} Claro</button></div>
+ <div class="modalfoot"><button class="primary" data-action="close">${icon('check')} Pronto</button></div>`)}
+document.addEventListener('click',e=>{if(e.target.closest('[data-erp-tema]')){$('#erpdrop')&&($('#erpdrop').innerHTML='');aparencia();return}
+ const b=e.target.closest('[data-tema]');if(b){escolher(b.dataset.tema);$$('.temacard').forEach(x=>x.classList.toggle('on',x===b));return}
+ const m=e.target.closest('[data-modo]');if(m){db.theme=m.dataset.modo;document.body.classList.toggle('light',db.theme==='light');save();aplicar(temaAtual());$$('[data-modo]').forEach(x=>x.classList.toggle('active',x===m))}});
+
+// ─────────────── Log e auditoria ───────────────
+const AREAS={payables:'Contas a pagar',bank_accounts:'Contas bancárias',bank_transactions:'Extrato bancário',cadastros:'Cadastros',closures:'Fechamentos',workspace_settings:'Configurações',crm_contacts:'CRM',workspace_members:'Equipe',access_requests:'Pedidos de acesso',accounting_lines:'Contabilidade (linhas)',account_map:'Plano de contas (mapa)',accounting_docs:'Contabilidade (documentos)',pricing_products:'Preços (produtos)',pricing_scenarios:'Preços (cenários)',atendimentos:'Atendimento',imports:'Importações',orders:'Pedidos',receipts:'Liberações/repasses',ledger:'Vínculos',integrations:'Integrações',purchase_invoices:'Notas de entrada'};
+const OPS={inclusao:['Inclusão','ok'],alteracao:['Alteração','info'],exclusao:['Exclusão','bad']};
+const CAMPOS={status:'situação',valor:'valor',valor_pago:'valor pago',vencimento:'vencimento',pago_em:'pago em',categoria:'categoria',centro_custo:'centro de custo',fornecedor:'fornecedor',descricao:'descrição',vinculo:'vínculo',linked_order:'pedido vinculado',observacao:'observação',dados:'dados',etapa_interna:'etapa',responsavel:'responsável',notas:'notas',role:'papel',saldo_inicial:'saldo inicial',data_saldo_inicial:'data do saldo inicial',ativo:'ativo',data:'data'};
+const ui={aba:'dados',periodo:'30',area:'',op:'',usuario:'',busca:'',pag:0,linhas:[],total:0,carregando:false,erro:'',chave:''};
+const POR_PAG=100;
+const fmtV=v=>v==null?'—':typeof v==='object'?JSON.stringify(v).slice(0,120):String(v).slice(0,120);
+function resumo(r){if(r.operacao!=='alteracao'){const c=r.campos||{};return [c.fornecedor,c.descricao,c.nome,c.dados?.nome,c.produto,c.action,c.email,c.valor!=null?money(Number(c.valor)):''].filter(Boolean).slice(0,3).join(' · ')||''}
+ return Object.entries(r.campos||{}).slice(0,4).map(([k,[a,b]])=>`${CAMPOS[k]||k.replace(/_/g,' ')}: ${fmtV(a)} → ${fmtV(b)}`).join(' ; ')}
+async function buscar(){if(!window.Cloud?.ws)return;const chave=JSON.stringify([ui.periodo,ui.area,ui.op,ui.usuario,ui.busca,ui.pag,Cloud.ws]);if(chave===ui.chave||ui.carregando)return;ui.carregando=true;ui.chave=chave;
+ try{let q=Cloud.client.from('audit_trail').select('*',{count:'exact'}).eq('workspace_id',Cloud.ws).order('em',{ascending:false}).range(ui.pag*POR_PAG,ui.pag*POR_PAG+POR_PAG-1);
+  if(ui.periodo!=='tudo')q=q.gte('em',new Date(Date.now()-Number(ui.periodo)*864e5).toISOString());if(ui.area)q=q.eq('tabela',ui.area);if(ui.op)q=q.eq('operacao',ui.op);
+  if(ui.usuario==='__sistema')q=q.eq('origem','sistema');else if(ui.usuario)q=q.eq('email',ui.usuario);if(ui.busca.trim())q=q.or(`registro.ilike.%${ui.busca.trim().replace(/[%,()]/g,'')}%,email.ilike.%${ui.busca.trim().replace(/[%,()]/g,'')}%`);
+  const {data,error,count}=await q;if(error)throw error;ui.linhas=data||[];ui.total=count||0;ui.erro=''}catch(e){ui.erro=e.message||String(e)}finally{ui.carregando=false}if(page==='auditoria'){const foco=document.activeElement?.id;render();if(foco==='audBusca'){const n=$('#audBusca');n.focus();n.setSelectionRange(n.value.length,n.value.length)}}}
+let usuarios=[];async function carregarUsuarios(){if(usuarios.length||!window.Cloud?.ws)return;const {data}=await Cloud.client.from('audit_trail').select('email').eq('workspace_id',Cloud.ws).not('email','is',null).order('em',{ascending:false}).limit(1000);usuarios=[...new Set((data||[]).map(x=>x.email))];if(page==='auditoria')render()}
+function view(){if(!window.Cloud?.ws)return '<div class="empty">Entre no portal para ver a auditoria.</div>';
+ const abas=`<div class="segtabs" style="margin-bottom:14px"><button class="${ui.aba==='dados'?'active':''}" data-aud-aba="dados">Alterações de dados</button><button class="${ui.aba==='eventos'?'active':''}" data-aud-aba="eventos">Eventos do sistema</button></div>`;
+ if(ui.aba==='eventos')return abas+eventos();
+ buscar();carregarUsuarios();
+ const sel=(k,opts,rot)=>`<select data-aud="${k}" aria-label="${rot}">${opts.map(([v,t])=>`<option value="${esc(v)}" ${ui[k]===v?'selected':''}>${esc(t)}</option>`).join('')}</select>`;
+ return `${abas}<div class="notice">Gravado pelo próprio banco de dados, sem depender da tela: <strong>ninguém consegue editar ou apagar esta trilha</strong>. Pedidos e liberações que chegam pela sincronização aparecem só quando alguém da equipe os altera.</div>
+ <div class="crmbar">${sel('periodo',[['1','Hoje'],['7','7 dias'],['30','30 dias'],['90','90 dias'],['tudo','Tudo']],'Período')}${sel('area',[['','Todas as áreas'],...Object.entries(AREAS).sort((a,b)=>a[1].localeCompare(b[1]))],'Área')}${sel('op',[['','Todas as operações'],['inclusao','Inclusões'],['alteracao','Alterações'],['exclusao','Exclusões']],'Operação')}${sel('usuario',[['','Todos os usuários'],['__sistema','Sistema (rotinas)'],...usuarios.map(u=>[u,u])],'Usuário')}
+  <div class="searchin">${icon('search')}<input type="search" id="audBusca" placeholder="Código do registro ou e-mail…" value="${esc(ui.busca)}"></div><button class="small" data-aud-csv="1">${icon('download')} Exportar</button></div>
+ ${ui.erro?`<div class="notice warnbox">${esc(ui.erro)}</div>`:''}
+ <div class="tablebox"><div class="tabletop"><div><h2>${ui.carregando&&!ui.linhas.length?'Carregando…':`${ui.total.toLocaleString('pt-BR')} registro(s)`}</h2><p class="caption">Clique numa linha para ver o antes e o depois de cada campo.</p></div>
+  <div class="row"><button class="small" data-aud-pag="-1" ${ui.pag?'':'disabled'}>‹</button><span class="caption">página ${ui.pag+1} de ${Math.max(1,Math.ceil(ui.total/POR_PAG))}</span><button class="small" data-aud-pag="1" ${(ui.pag+1)*POR_PAG<ui.total?'':'disabled'}>›</button><button class="small" data-aud-atualizar="1">${icon('refresh')} Atualizar</button></div></div>
+ <div class="tablewrap"><table><thead><tr><th>Quando</th><th>Quem</th><th>Área</th><th>Operação</th><th>Registro</th><th>O que mudou</th></tr></thead><tbody>
+ ${ui.linhas.map((r,i)=>{const [o,t]=OPS[r.operacao]||[r.operacao,''];return `<tr class="clickrow" data-aud-ver="${i}"><td>${new Date(r.em).toLocaleString('pt-BR')}</td><td>${esc(r.email||(r.origem==='sistema'?'Sistema':'—'))}</td><td>${esc(AREAS[r.tabela]||r.tabela)}</td><td><span class="badge ${t}">${o}</span></td><td>${esc(String(r.registro||'').slice(0,40))}</td><td class="audres">${esc(resumo(r))}</td></tr>`}).join('')||`<tr><td colspan="6" class="empty">${ui.carregando?'Carregando…':'Nada registrado com esses filtros.'}</td></tr>`}</tbody></table></div></div>`}
+function eventos(){const l=(db.audit||[]).filter(a=>!ui.busca||normalized([a.action,a.detail,a.actor].join(' ')).includes(normalized(ui.busca)));
+ return `<div class="crmbar"><div class="searchin">${icon('search')}<input type="search" id="audBusca" placeholder="Importações, sincronizações, vínculos, respostas…" value="${esc(ui.busca)}"></div></div>
+ <div class="tablebox"><div class="tabletop"><div><h2>${l.length.toLocaleString('pt-BR')} evento(s)</h2><p class="caption">Importações, sincronizações, vínculos automáticos, fechamentos e respostas enviadas a clientes.</p></div></div><div class="tablewrap"><table><thead><tr><th>Quando</th><th>Quem</th><th>Evento</th><th>Detalhe</th></tr></thead><tbody>
+ ${l.slice(0,500).map(a=>`<tr><td>${new Date(a.time).toLocaleString('pt-BR')}</td><td>${esc(a.actor||'—')}</td><td>${esc(a.action)}</td><td class="audres">${esc(String(a.detail||'').slice(0,220))}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Nenhum evento.</td></tr>'}</tbody></table></div></div>`}
+function detalhe(r){const [o]=OPS[r.operacao]||[r.operacao];const c=r.campos||{};
+ const linhas=r.operacao==='alteracao'?Object.entries(c).map(([k,[a,b]])=>`<tr><td>${esc(CAMPOS[k]||k.replace(/_/g,' '))}</td><td class="red">${esc(fmtV(a))}</td><td class="green">${esc(fmtV(b))}</td></tr>`).join(''):Object.entries(c).filter(([,v])=>v!=null&&v!=='').map(([k,v])=>`<tr><td>${esc(CAMPOS[k]||k.replace(/_/g,' '))}</td><td colspan="2">${esc(fmtV(v))}</td></tr>`).join('');
+ modal(`${o} · ${AREAS[r.tabela]||r.tabela}`,`<p class="caption">${new Date(r.em).toLocaleString('pt-BR')} · ${esc(r.email||(r.origem==='sistema'?'Sistema (rotina automática)':'—'))} · registro ${esc(r.registro||'—')}</p>
+ <div class="tablewrap"><table><thead><tr><th>Campo</th><th>${r.operacao==='alteracao'?'Antes':'Valor'}</th><th>${r.operacao==='alteracao'?'Depois':''}</th></tr></thead><tbody>${linhas||'<tr><td colspan="3">—</td></tr>'}</tbody></table></div>
+ <div class="modalfoot"><button data-action="close">Fechar</button></div>`)}
+function csv(){const cab=['quando','usuario','area','operacao','registro','alteracoes'];const lin=ui.linhas.map(r=>[new Date(r.em).toLocaleString('pt-BR'),r.email||r.origem,AREAS[r.tabela]||r.tabela,r.operacao,r.registro||'',resumo(r)]);
+ const txt=[cab,...lin].map(l=>l.map(x=>`"${String(x).replace(/"/g,'""')}"`).join(';')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+txt],{type:'text/csv'}));a.download=`auditoria-${new Date().toISOString().slice(0,10)}.csv`;a.click()}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-aud-aba],[data-aud-pag],[data-aud-ver],[data-aud-csv],[data-aud-atualizar]');if(!b)return;const d=b.dataset;
+ if(d.audAba){ui.aba=d.audAba;ui.busca='';render()}if(d.audPag){ui.pag=Math.max(0,ui.pag+Number(d.audPag));buscar()}if(d.audVer)detalhe(ui.linhas[Number(d.audVer)]);if(d.audCsv)csv();if(d.audAtualizar){ui.chave='';usuarios=[];buscar()}});
+let tBusca;function bind(){$$('[data-aud]').forEach(s=>s.onchange=()=>{ui[s.dataset.aud]=s.value;ui.pag=0;buscar()});const i=$('#audBusca');if(i)i.oninput=e=>{ui.busca=e.target.value;ui.pag=0;clearTimeout(tBusca);if(ui.aba==='eventos'){const pos=e.target.selectionStart;render();const n=$('#audBusca');n.focus();n.setSelectionRange(pos,pos)}else tBusca=setTimeout(buscar,400)}}
+addPage('auditoria','shield','Log e auditoria',view,'Cada inclusão, alteração e exclusão feita no portal: quem, quando e o antes/depois de cada campo.','',bind);
+})();
