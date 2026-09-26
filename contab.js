@@ -22,7 +22,7 @@ const PLANO=[
  ['6','DESPESAS','D'],['6.1','Despesas de venda','D'],['6.1.01','Tarifas de marketplace','D'],['6.1.02','Fretes e logística','D'],['6.1.03','Marketing e anúncios','D'],
  ['6.2','Pessoal','D'],['6.2.01','Salários e encargos','D'],['6.2.02','Pró-labore','D'],
  ['6.3','Administrativas','D'],['6.3.01','Aluguel','D'],['6.3.02','Água, luz e internet','D'],['6.3.03','Contabilidade','D'],['6.3.04','Serviços de terceiros','D'],['6.3.05','Material de uso e consumo','D'],['6.3.06','Sistemas e softwares','D'],['6.3.07','Seguros','D'],['6.3.08','Reembolsos de despesas','D'],
- ['6.4','Impostos e taxas','D'],['6.4.01','Impostos e taxas','D'],['6.5','Despesas financeiras','D'],['6.5.01','Tarifas bancárias','D'],['6.5.02','Juros e multas','D'],['6.9','Outras despesas','D'],['6.9.01','Outras despesas','D'],
+ ['6.4','Impostos e taxas','D'],['6.4.01','Impostos e taxas','D'],['6.5','Despesas financeiras','D'],['6.5.01','Tarifas bancárias','D'],['6.5.02','Juros e multas','D'],['6.8','Tributos sobre o lucro','D'],['6.8.01','IRPJ, CSLL e outros DARF federais','D'],['6.9','Outras despesas','D'],['6.9.01','Outras despesas','D'],
  ['9','CONTAS TRANSITÓRIAS','A'],['9.1','Transitórias','A'],['9.1.01','Movimentos bancários a classificar','A']];
 const CAT={'Compra de mercadorias':'1.1.04','Embalagens':'5.1.02','ICMS DIFAL / GNRE':'4.2.02','PIS e COFINS':'4.2.01','Impostos e taxas':'6.4.01','Imobilizado · veículos':'1.2.01','Máquinas e equipamentos':'1.2.02','Móveis e utensílios':'1.2.03',
  'Aluguel':'6.3.01','Pró-labore':'6.2.02','Salários e encargos':'6.2.01','Contabilidade':'6.3.03','Serviços de terceiros':'6.3.04','Material de uso e consumo':'6.3.05','Sistemas e softwares':'6.3.06','Água, luz e internet':'6.3.02','Seguros':'6.3.07',
@@ -66,9 +66,11 @@ function diario(){const k=[cfg.provisao,db.orders.length,(db.bankTx||[]).length,
   if(v.tipo==='transferencia'){const d=normalized((v.desc||'')+' '+h);const outra=/mercado pago|wolfach/.test(d)?'1.1.03.01':/shopee|maree/.test(d)?'1.1.03.02':/magalu/.test(d)?'1.1.03.03':/saque|caixa/.test(d)?'1.1.01.90':'1.1.01.99';par(t.data,v.desc||h,o,c,outra,t.valor);continue}
   // Despesa ou receita direto no extrato.
   if(v.tipo==='despesa'&&String(v.id||'').startsWith('EXT-'))pagosPeloBanco.add(v.id);
-  par(t.data,v.desc||h,o,c,contaTrib(v.categoria||t.categoria),t.valor)}
+  const darf=/darf|receita federal/i.test(h+' '+(v.desc||''))&&/impostos e taxas/i.test(v.categoria||t.categoria||'');
+  par(t.data,v.desc||h,o,c,darf?'6.8.01':contaTrib(v.categoria||t.categoria),t.valor)}
  // Títulos (competência): notas de entrada e recorrentes/lançamentos entram em Fornecedores; os criados pelo extrato já estão acima.
- for(const p of db.payables||[]){if(p.status==='cancelado'||p.origem==='extrato')continue;const d=p.emissao||p.vencimento;if(!d)continue;const o={tipo:'titulo',id:p.id};
+ for(const p of db.payables||[]){if(p.status==='cancelado'||p.origem==='extrato')continue;// Recorrentes (aluguel, pró-labore, contador…) são da competência do vencimento, não da data em que foram criados.
+  const d=p.origem==='recorrente'?p.vencimento:(p.emissao||p.vencimento);if(!d)continue;const o={tipo:'titulo',id:p.id};
   par(d,`${p.fornecedor||p.descricao}${p.documento?' · doc '+p.documento:''}${p.parcelas>1?` · ${p.parcela}/${p.parcelas}`:''}`,o,contaTrib(p.categoria),'2.1.01',p.valor+(p.juros||0)-(p.desconto||0));
   if(p.status==='pago'&&!pagosPeloBanco.has(p.id)&&p.pagoEm)par(p.pagoEm,`Pagamento sem extrato · ${p.fornecedor||p.descricao}${p.conta?' · '+p.conta:''}`,o,'2.1.01','1.1.09',p.valorPago||p.valor)}
  // Devoluções de clientes (notas de entrada de devolução).
@@ -107,7 +109,7 @@ function balancete(){const {ini,fim:f}=periodo(),{s,plano}=saldos(f,ini);
   return `<tr class="${nivel<=2?'ctbgrupo':'clickrow'} n${nivel}" ${nivel>2?`data-ct-conta="${c}"`:''}><td><span class="mono caption">${c}</span> ${esc(n)}</td><td class="num">${mf(ant)}</td><td class="num">${money(x.deb)}</td><td class="num">${money(x.cred)}</td><td class="num"><strong>${mf(atual)}</strong></td></tr>`}).join('')}</tbody></table></div></div>`}
 
 function dre(){const {ini,fim:f}=periodo(),{s}=saldos(f,ini),mov=c=>{const x=s.get(c);return x?x.deb-x.cred:0};
- const rb=-mov('4.1'),ded=mov('4.2'),rl=rb-ded,cmv=mov('5.1'),lb=rl-cmv,dv=mov('6.1'),pes=mov('6.2'),adm=mov('6.3'),imp=mov('6.4'),out=mov('6.9'),ebitda=lb-dv-pes-adm-imp-out,fin=-mov('4.3')-mov('6.5'),res=ebitda+fin;
+ const rb=-mov('4.1'),ded=mov('4.2'),rl=rb-ded,cmv=mov('5.1'),lb=rl-cmv,dv=mov('6.1'),pes=mov('6.2'),adm=mov('6.3'),imp=mov('6.4'),out=mov('6.9'),ebitda=lb-dv-pes-adm-imp-out,fin=-mov('4.3')-mov('6.5'),ir=mov('6.8'),res=ebitda+fin-ir;
  const pc=v=>rb?`<span class="caption">${(v/rb*100).toFixed(1).replace('.',',')}%</span>`:'';
  const l=(t,v,cls='',c='')=>`<tr class="${cls}" ${c?`data-ct-conta="${c}"`:''}><td>${t}</td><td class="num">${mf(v)}</td><td class="num">${pc(v)}</td></tr>`;
  return `<div class="grid two"><div class="tablebox"><div class="tabletop"><div><h2>DRE · ${ui.acumulado?'acumulado de '+month.slice(0,4):mesBR(month)}</h2><p class="caption">Gerada pelos lançamentos automáticos. Clique numa linha para ver o razão.</p></div></div><div class="tablewrap"><table class="ctb"><tbody>
@@ -115,7 +117,7 @@ function dre(){const {ini,fim:f}=periodo(),{s}=saldos(f,ini),mov=c=>{const x=s.g
  ${l('(−) Deduções (ICMS/DIFAL, PIS/COFINS, devoluções)',-ded,'n3')}${l('Receita líquida',rl,'ctbgrupo')}
  ${l('(−) CMV',-mov('5.1.01'),'n3 clickrow','5.1.01')}${l('(−) Embalagens',-mov('5.1.02'),'n3 clickrow','5.1.02')}${l('Lucro bruto',lb,'ctbgrupo')}
  ${l('(−) Tarifas de marketplace',-mov('6.1.01'),'n3 clickrow','6.1.01')}${l('(−) Fretes',-mov('6.1.02'),'n3 clickrow','6.1.02')}${l('(−) Marketing',-mov('6.1.03'),'n3 clickrow','6.1.03')}${l('(−) Pessoal',-pes,'n3')}${l('(−) Administrativas',-adm,'n3')}${l('(−) Impostos e taxas',-imp,'n3')}${l('(−) Outras',-out,'n3')}
- ${l('Resultado operacional',ebitda,'ctbgrupo')}${l('Resultado financeiro',fin,'n3')}${l('Resultado do período',res,'ctbgrupo ctbfinal')}</tbody></table></div></div>
+ ${l('Resultado operacional',ebitda,'ctbgrupo')}${l('Resultado financeiro',fin,'n3')}${l('(−) IRPJ, CSLL e DARF federais',-ir,'n3 clickrow','6.8.01')}${l('Resultado do período',res,'ctbgrupo ctbfinal')}</tbody></table></div></div>
  <div class="card"><h2>Como ler</h2><label class="check-l"><input type="checkbox" class="check" id="ctProv" ${cfg.provisao?'checked':''}> Tributos sobre vendas por competência (provisão pela alíquota efetiva do escritório${aliqCache.get(month)?': '+(aliqCache.get(month).r*100).toFixed(1).replace('.',',')+'%':''})</label><p class="caption">Desligado, os tributos entram só quando são pagos (GNRE/DARE).</p><p class="caption" style="line-height:1.8">A DRE sai direto do diário: vendas e tarifas pelos pedidos, CMV pelos itens vendidos × custo do produto (Bling/Tabela de preços), notas e títulos pela data de emissão, e o que foi pago direto no banco (GNRE, aluguel, pró-labore…) pela data do extrato.<br><br>Compare com a <button class="small quiet" data-nav="contabil">DRE do escritório</button> para achar diferenças de classificação ou de data.${diario().semCusto?`<br><br><span class="gold">${diario().semCusto} item(ns) vendido(s) sem custo cadastrado — o CMV fica subestimado. Cadastre o custo em Estoque ou na Tabela de preços.</span>`:''}</p></div></div>`}
 
 function balanco(){const {fim:f}=periodo(),{s}=saldos(f),sal=c=>{const x=s.get(c);return x?x.deb-x.cred:0};
@@ -139,11 +141,23 @@ function razao(c){const {L,plano}=diario(),{ini,fim:f}=periodo();let saldo=0;con
  <div class="tablewrap" style="max-height:60vh"><table><thead><tr><th>Data</th><th>Histórico</th><th class="num">Débito</th><th class="num">Crédito</th><th class="num">Saldo</th></tr></thead><tbody>${rows.slice(-1500).join('')||'<tr><td colspan="5" class="empty">Sem lançamentos no período.</td></tr>'}</tbody></table></div>
  <div class="modalfoot"><button data-action="close">Fechar</button></div>`)}
 
-function view(){const abas=[['balancete','Balancete'],['dre','DRE'],['balanco','Balanço'],['diario','Diário'],['plano','Plano de contas']];
+// Conferência: DRE automática × DRE do balancete do escritório, mês a mês, com a diferença de cada linha.
+function conferencia(){const meses=[...new Set(db.orders.map(o=>o.date.slice(0,7)))].sort().slice(-7).filter(m=>m<=new Date().toISOString().slice(0,7));
+ const aut=m=>{const [y,mm]=m.split('-').map(Number),{s}=saldos(new Date(y,mm,0).toLocaleDateString('sv-SE'),m+'-01'),mv=c=>{const x=s.get(c);return x?x.deb-x.cred:0};const rb=-mv('4.1'),ded=mv('4.2'),cmv=mv('5.1'),com=mv('6.1'),out=mv('6.2')+mv('6.3')+mv('6.4')+mv('6.9');return {rb,ded,cmv,com,out,op:rb-ded-cmv-com-out}};
+ const esc_=m=>{try{const d=window.Gestao?.dreMes?.(m);if(d?.fonte!=='balancete')return null;const v=d.v;return {rb:v.receita||0,ded:-(v.impostos||0)-(v.devolucoes||0),cmv:-(v.cmv||0),com:-(v.comerciais||0),out:-(v.trabalhistas||0)-(v.administrativas||0)-(v.outras||0),op:v['=ebitda']||0}}catch{return null}};
+ const L=[['rb','Receita bruta'],['ded','Deduções e tributos'],['cmv','CMV'],['com','Despesas comerciais (tarifas, fretes, marketing)'],['out','Demais despesas operacionais'],['op','Resultado operacional (EBITDA)']];
+ const cols=meses.map(m=>({m,a:aut(m),e:esc_(m)}));
+ return `<div class="notice">Mesma operação, duas visões: a <strong>automática</strong> (pedido a pedido, tarifa real de cada venda, CMV pelo custo do produto) e a do <strong>escritório</strong> (balancete importado em Resultado › DRE do escritório). Diferenças grandes indicam lançamento em outro mês, tarifa contabilizada por nota de serviço, custo médio diferente ou conta classificada em outra linha — bons temas para a conversa com a Escoben.</div>
+ <div class="tablebox"><div class="tablewrap"><table class="ctb"><thead><tr><th>Linha</th>${cols.map(c=>`<th class="num">${new Date(c.m+'-15T12:00:00').toLocaleDateString('pt-BR',{month:'short',year:'2-digit'})}</th>`).join('')}</tr></thead><tbody>
+ ${L.map(([k,t])=>`<tr class="ctbgrupo"><td>${t}</td>${cols.map(()=>'<td></td>').join('')}</tr>
+  <tr class="n3"><td>Automática</td>${cols.map(c=>`<td class="num">${money(c.a[k])}</td>`).join('')}</tr>
+  <tr class="n3"><td>Escritório</td>${cols.map(c=>`<td class="num">${c.e?money(c.e[k]):'<span class="caption">sem balancete</span>'}</td>`).join('')}</tr>
+  <tr class="n3"><td>Diferença</td>${cols.map(c=>{if(!c.e)return '<td></td>';const d=c.a[k]-c.e[k],rel=Math.abs(c.e[k])>1?Math.abs(d/c.e[k]):0;return `<td class="num"><span class="${rel>0.1?'red':rel>0.03?'gold':'green'}">${money(d)}</span>${Math.abs(c.e[k])>1?`<br><span class="caption">${(d/c.e[k]*100).toFixed(1).replace('.',',')}%</span>`:''}</td>`}).join('')}</tr>`).join('')}</tbody></table></div></div>`}
+function view(){const abas=[['balancete','Balancete'],['dre','DRE'],['balanco','Balanço'],['conferencia','Conferência com o escritório'],['diario','Diário'],['plano','Plano de contas']];
  const {L}=diario();
  return `<div class="notice"><strong>Contabilidade automática.</strong> ${L.length.toLocaleString('pt-BR')} lançamentos em partidas dobradas gerados a partir de vendas, tarifas, CMV, notas, títulos e extrato — sem digitação. É a visão gerencial do EcomBalance; a escrituração oficial continua com o escritório (exporte o diário para ele).</div>
  <div class="crmbar"><div class="segtabs">${abas.map(([k,t])=>`<button class="${ui.aba===k?'active':''}" data-ct-aba="${k}">${t}</button>`).join('')}</div><label class="check-l" style="margin:0"><input type="checkbox" class="check" id="ctAcum" ${ui.acumulado?'checked':''}> Acumulado no ano</label></div>
- ${ui.aba==='balancete'?balancete():ui.aba==='dre'?dre():ui.aba==='balanco'?balanco():ui.aba==='diario'?diarioView():planoView()}`}
+ ${ui.aba==='balancete'?balancete():ui.aba==='dre'?dre():ui.aba==='balanco'?balanco():ui.aba==='conferencia'?conferencia():ui.aba==='diario'?diarioView():planoView()}`}
 function planoView(){const {plano}=diario(),inv={};for(const [k,c] of Object.entries(CAT))(inv[c]=inv[c]||[]).push(k);
  return `<div class="tablebox"><div class="tabletop"><div><h2>Plano de contas</h2><p class="caption">Estruturado para e-commerce. As categorias do financeiro caem nas contas indicadas.</p></div></div><div class="tablewrap"><table><thead><tr><th>Código</th><th>Conta</th><th>Categorias do EcomBalance</th></tr></thead><tbody>
  ${[...plano.values()].sort((a,b)=>a.c.localeCompare(b.c,undefined,{numeric:true})).map(x=>`<tr class="${x.c.split('.').length<=2?'ctbgrupo':''}"><td class="mono">${x.c}</td><td>${esc(x.n)}</td><td class="caption">${esc((inv[x.c]||[]).join(', '))}</td></tr>`).join('')}</tbody></table></div></div>`}
