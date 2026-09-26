@@ -80,6 +80,22 @@ async function montar(db: SupabaseClient, ws: string, cfg: Fiscal, pedido: any) 
   }
   const uf = String(end?.uf || cli.state || pedido.state || "").toUpperCase();
   if (!uf || !end?.endereco || !end?.municipio || !dig(end?.cep)) throw new HttpError(400, "Endereço do comprador incompleto no Bling (rua, município, CEP e UF são obrigatórios na NF-e).");
+  return corpoNota(db, ws, cfg, {
+    itens: itens.map((i) => ({ sku: i.sku, title: i.title, qty: i.qty, price: i.price })), gross: Number(pedido.gross), nome: cli.name, doc: cli.doc, ie: null,
+    end: { logradouro: end.endereco, numero: end.numero, complemento: end.complemento, bairro: end.bairro, municipio: end.municipio, uf, cep: end.cep }, platform: pedido.platform,
+  });
+}
+
+export interface DadosNota {
+  itens: { sku: string; title?: string; qty: number; price: number }[]; gross: number; nome: string; doc: string; ie?: string | null;
+  end: { logradouro: string; numero?: string; complemento?: string; bairro?: string; municipio: string; uf: string; cep: string };
+  platform?: string; frete?: number; desconto?: number; presenca?: number; forma_pagamento?: string; email?: string;
+  duplicatas?: { numero: string; vencimento: string; valor: number }[];
+}
+/** Corpo da NF-e (layout Focus v2) a partir de dados já normalizados — pedido de marketplace ou venda direta. */
+async function corpoNota(db: SupabaseClient, ws: string, cfg: Fiscal, d: DadosNota) {
+  const itens = d.itens, uf = String(d.end.uf).toUpperCase(), end = d.end;
+  if (!uf || !end.logradouro || !end.municipio || !dig(end.cep)) throw new HttpError(400, "Endereço do destinatário incompleto (rua, município, CEP e UF são obrigatórios na NF-e).");
   const skus = itens.map((i) => String(i.sku ?? "").trim()).filter(Boolean);
   const { data: prods } = await db.from("produtos").select("id,nome,ncm,origem,cest,gtin").eq("workspace_id", ws).in("id", skus.length ? skus : ["-"]);
   const P = new Map((prods ?? []).map((p) => [p.id, p]));
@@ -91,27 +107,29 @@ async function montar(db: SupabaseClient, ws: string, cfg: Fiscal, pedido: any) 
   let difalTotal = 0, tributosAprox = 0;
   const homolog = cfg.ambiente === "homologacao";
   const soma = round(itens.reduce((s, i) => s + Number(i.qty) * Number(i.price), 0));
-  const frete = round(Math.max(0, Number(pedido.gross) - soma));
-  const doc = dig(cli.doc);
+  const frete = round(d.frete != null ? Number(d.frete) : Math.max(0, Number(d.gross) - soma)), desconto = round(Number(d.desconto) || 0);
+  const doc = dig(d.doc), ie = dig(d.ie);
+  // Contribuinte = CNPJ com inscrição estadual: CFOP de revenda, sem DIFAL (o destinatário recolhe), não é consumidor final.
+  const contribuinte = doc.length === 14 && ie.length > 0;
   const items = itens.map((i, n) => {
     const p = P.get(String(i.sku).trim())!, q = Number(i.qty), vu = round(Number(i.price)), vb = round(q * vu);
     // Frete rateado no item (entra na base do ICMS).
-    const fr = frete && soma ? round(frete * vb / soma) : 0, base = round(vb + fr);
+    const fr = frete && soma ? round(frete * vb / soma) : 0, ds = desconto && soma ? round(desconto * vb / soma) : 0, base = round(vb + fr - ds);
     const orig = Number(p.origem ?? cfg.origem_padrao), inter = interno ? cfg.aliq_icms_interna : aliqInterestadual(uf, orig, cfg);
     tributosAprox += base * (cfg.ibpt_federal + cfg.ibpt_estadual) / 100;
     // Cálculo idêntico ao do Bling (conferido ao centavo em 5 notas): ICMS → DIFAL/FCP → PIS/COFINS sem ICMS → IBS/CBS sem PIS/COFINS.
     const vIcms = round(base * inter / 100);
-    const temDifal = !interno && difalUF && doc.length !== 14;
+    const temDifal = !interno && difalUF && !contribuinte;
     const vDifal = temDifal ? round(base * Math.max(0, aliqDest - inter) / 100) : 0, vFcp = temDifal ? round(base * fcpDest / 100) : 0;
     const basePis = round(cfg.pis_exclui_icms ? base - vIcms - vDifal - vFcp : base);
     const vPis = round(basePis * cfg.aliq_pis / 100), vCofins = round(basePis * cfg.aliq_cofins / 100);
     const baseIbs = round(basePis - vPis - vCofins), vCbs = round(baseIbs * cfg.aliq_cbs / 100), vIbsUf = round(baseIbs * cfg.aliq_ibs_uf / 100), vIbsMun = round(baseIbs * cfg.aliq_ibs_mun / 100);
     const it: Record<string, unknown> = {
       numero_item: n + 1, codigo_produto: i.sku, descricao: n === 0 && homolog ? "NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL" : String(i.title ?? p.nome).slice(0, 120),
-      cfop: interno ? cfg.cfop_interno : cfg.cfop_interestadual, codigo_ncm: p.ncm, ...(p.cest ? { cest: p.cest } : {}),
+      cfop: interno ? cfg.cfop_interno : (contribuinte ? cfg.cfop_interestadual_contribuinte : cfg.cfop_interestadual), codigo_ncm: p.ncm, ...(p.cest ? { cest: p.cest } : {}),
       codigo_barras_comercial: p.gtin || "SEM GTIN", codigo_barras_tributavel: p.gtin || "SEM GTIN",
       unidade_comercial: "UN", quantidade_comercial: q, valor_unitario_comercial: vu, unidade_tributavel: "UN", quantidade_tributavel: q, valor_unitario_tributavel: vu,
-      valor_bruto: vb, ...(fr ? { valor_frete: fr } : {}), inclui_no_total: 1,
+      valor_bruto: vb, ...(fr ? { valor_frete: fr } : {}), ...(ds ? { valor_desconto: ds } : {}), inclui_no_total: 1,
       icms_origem: orig, icms_situacao_tributaria: cfg.cst_icms,
       icms_modalidade_base_calculo: 3, icms_base_calculo: base, icms_aliquota: inter, icms_valor: vIcms,
       pis_situacao_tributaria: cfg.cst_pis, pis_base_calculo: basePis, pis_aliquota_porcentual: cfg.aliq_pis, pis_valor: vPis,
@@ -131,25 +149,29 @@ async function montar(db: SupabaseClient, ws: string, cfg: Fiscal, pedido: any) 
     }
     return it;
   });
-  const intermed = cfg.intermediadores?.[pedido.platform] ?? {}, cnpjInt = dig(intermed.cnpj || INTERMEDIADOR[pedido.platform] || "");
+  const plat = d.platform ?? "", intermed = cfg.intermediadores?.[plat] ?? {}, cnpjInt = dig(intermed.cnpj || INTERMEDIADOR[plat] || "");
   const idInt = String(intermed.id ?? "").trim();
-  if (cnpjInt && !idInt) throw new HttpError(400, `Informe o identificador da loja no intermediador (${pedido.platform}) na Parametrização fiscal.`);
+  if (cnpjInt && !idInt) throw new HttpError(400, `Informe o identificador da loja no intermediador (${plat}) na Parametrização fiscal.`);
+  const total = round(soma + frete - desconto), dup = d.duplicatas ?? [];
+  const aPrazo = dup.some((x) => x.vencimento > new Date().toISOString().slice(0, 10));
   const obs = [cfg.texto_difal && difalTotal ? `Valor do ICMS DIFAL para UF de destino R$ ${difalTotal.toFixed(2).replace(".", ",")}` : "",
     `Total aproximado de tributos: R$ ${tributosAprox.toFixed(2).replace(".", ",")} (${(cfg.ibpt_federal + cfg.ibpt_estadual).toFixed(2).replace(".", ",")}%) - Federais ${String(cfg.ibpt_federal).replace(".", ",")}% Estaduais ${String(cfg.ibpt_estadual).replace(".", ",")}%. Fonte IBPT.`,
     cfg.texto_adicional || ""].filter(Boolean).join(" | ");
   return {
-    natureza_operacao: cfg.natureza, data_emissao: new Date().toISOString(), tipo_documento: 1, finalidade_emissao: 1,
-    local_destino: interno ? 1 : 2, consumidor_final: 1, presenca_comprador: Number(cfg.presenca), modalidade_frete: Number(cfg.modalidade_frete),
+    natureza_operacao: contribuinte ? cfg.natureza_contribuinte : cfg.natureza, data_emissao: new Date().toISOString(), tipo_documento: 1, finalidade_emissao: 1,
+    local_destino: interno ? 1 : 2, consumidor_final: contribuinte ? 0 : 1, presenca_comprador: Number(d.presenca ?? cfg.presenca), modalidade_frete: Number(cfg.modalidade_frete),
     cnpj_emitente: dig(cfg.cnpj), serie: cfg.serie,
-    nome_destinatario: homolog ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL" : String(cli.name ?? "").slice(0, 60),
-    ...(doc.length === 14 ? { cnpj_destinatario: doc } : { cpf_destinatario: doc }), indicador_inscricao_estadual_destinatario: 9,
-    logradouro_destinatario: String(end.endereco).slice(0, 60), numero_destinatario: String(end.numero || "S/N").slice(0, 60),
+    nome_destinatario: homolog ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL" : String(d.nome ?? "").slice(0, 60),
+    ...(doc.length === 14 ? { cnpj_destinatario: doc } : { cpf_destinatario: doc }),
+    indicador_inscricao_estadual_destinatario: contribuinte ? 1 : 9, ...(contribuinte ? { inscricao_estadual_destinatario: ie } : {}), ...(d.email ? { email_destinatario: d.email } : {}),
+    logradouro_destinatario: String(end.logradouro).slice(0, 60), numero_destinatario: String(end.numero || "S/N").slice(0, 60),
     ...(end.complemento ? { complemento_destinatario: String(end.complemento).slice(0, 60) } : {}), bairro_destinatario: String(end.bairro || "Centro").slice(0, 60),
     municipio_destinatario: end.municipio, uf_destinatario: uf, cep_destinatario: dig(end.cep), pais_destinatario: "Brasil",
     ...(cnpjInt ? { indicador_intermediario: 1, cnpj_intermediario: cnpjInt, id_intermediario: idInt.slice(0, 60) } : { indicador_intermediario: 0 }),
     informacoes_adicionais_contribuinte: obs.slice(0, 2000),
-    ...(frete ? { valor_frete: frete } : {}),
-    formas_pagamento: [{ forma_pagamento: String(cfg.forma_pagamento), valor_pagamento: round(Number(pedido.gross)) }],
+    ...(frete ? { valor_frete: frete } : {}), ...(desconto ? { valor_desconto: desconto } : {}),
+    formas_pagamento: [{ indicador_pagamento: aPrazo ? 1 : 0, forma_pagamento: String(d.forma_pagamento ?? cfg.forma_pagamento), valor_pagamento: total }],
+    ...(dup.length ? { numero_fatura: "1", valor_original_fatura: total, valor_desconto_fatura: 0, valor_liquido_fatura: total, duplicatas: dup.map((x) => ({ numero: x.numero, data_vencimento: x.vencimento, valor: round(x.valor) })) } : {}),
     items,
   };
 }
@@ -225,10 +247,37 @@ export async function processarFilaFiscal(db: SupabaseClient, ws: string, fila: 
   const res: Record<string, unknown>[] = [];
   for (const pedido of fila.slice(0, 6)) {
     try {
-      const r = await emitirNFe(db, ws, pedido, "Teste automático (homologação)");
+      const r = pedido.startsWith("VD:") ? await emitirVendaDireta(db, ws, pedido.slice(3), "Teste automático (homologação)") : await emitirNFe(db, ws, pedido, "Teste automático (homologação)");
       if (r.status !== "erro") { await sleep(6000); res.push({ pedido, ...(await consultarNFe(db, ws, r.ref)) }); }
       else res.push({ pedido, ...r });
     } catch (e) { res.push({ pedido, erro: String((e as Error).message ?? e) }); }
   }
   return res;
+}
+
+/** Emissão da nota de uma venda direta (B2B/atacado). Mesmas regras da parametrização; destinatário e parcelas da venda. */
+export async function emitirVendaDireta(db: SupabaseClient, ws: string, vendaId: string, quem: string, confirmaProducao = false) {
+  const cfg = await configFiscal(db, ws);
+  if (cfg.ambiente === "producao" && !confirmaProducao) throw new HttpError(400, "Emissão em produção precisa de confirmação.");
+  const { data: v } = await db.from("vendas_diretas").select("*").eq("workspace_id", ws).eq("id", vendaId).maybeSingle();
+  if (!v) throw new HttpError(404, "Venda não encontrada.");
+  const { data: ja } = await db.from("notas_fiscais").select("ref,status").eq("workspace_id", ws).eq("pedido", vendaId).eq("ambiente", cfg.ambiente);
+  if ((ja ?? []).some((n) => ["autorizado", "processando_autorizacao", "processando"].includes(n.status))) throw new HttpError(400, "Esta venda já tem nota autorizada ou em processamento neste ambiente.");
+  const c = v.cliente ?? {}, e = c.endereco ?? {};
+  const payload = await corpoNota(db, ws, cfg, {
+    itens: (v.itens ?? []).map((i: any) => ({ sku: i.sku, title: i.nome, qty: Number(i.qtd), price: Number(i.preco) })), gross: Number(v.total), nome: c.nome, doc: c.doc, ie: c.ie, email: c.email,
+    end: { logradouro: e.logradouro, numero: e.numero, complemento: e.complemento, bairro: e.bairro, municipio: e.municipio, uf: e.uf, cep: e.cep },
+    frete: Number(v.frete) || 0, desconto: Number(v.desconto) || 0, presenca: 9, forma_pagamento: v.forma_pagamento || "15",
+    duplicatas: (v.parcelas ?? []).map((p: any, k: number) => ({ numero: String(k + 1).padStart(3, "0"), vencimento: p.vencimento, valor: Number(p.valor) })),
+  });
+  const ref = `EBV${cfg.ambiente === "producao" ? "P" : "H"}-${v.numero ?? vendaId.replace(/[^A-Za-z0-9]/g, "")}-${(ja ?? []).length + 1}`;
+  const r = await focus(cfg.ambiente, "POST", `/v2/nfe?ref=${encodeURIComponent(ref)}`, payload);
+  const row = {
+    workspace_id: ws, ref, pedido: vendaId, ambiente: cfg.ambiente, status: r.ok ? (r.j.status ?? "processando_autorizacao") : "erro",
+    mensagem: r.ok ? (r.j.mensagem_sefaz ?? null) : `${r.j.codigo ?? r.status}: ${r.j.mensagem ?? ""}${(r.j.erros ?? []).map((x: any) => ` · ${x.campo ?? ""} ${x.mensagem ?? ""}`).join("")}`.slice(0, 1000),
+    valor: Number(v.total), payload, resposta: r.j, criado_por: quem, updated_at: new Date().toISOString(),
+  };
+  await db.from("notas_fiscais").upsert(row, { onConflict: "workspace_id,ref" });
+  await db.from("vendas_diretas").update({ nfe_ref: ref, updated_at: new Date().toISOString() }).eq("workspace_id", ws).eq("id", vendaId);
+  return { ref, status: row.status, mensagem: row.mensagem };
 }

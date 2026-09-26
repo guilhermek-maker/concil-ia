@@ -9,7 +9,7 @@ import { responderML, sincronizarAtendimentoML } from "../_shared/atendimento_ml
 import { sugerirAtendimento } from "../_shared/atendimento_ia.ts";
 import { detalhesFiscaisBling, sincronizarEstoqueBling } from "../_shared/estoque_bling.ts";
 import { lerRegrasFiscaisBling } from "../_shared/regras_bling.ts";
-import { cancelarNFe, configFiscal, consultarNFe, diagnosticoFiscal, emitirNFe, processarFilaFiscal, statusFiscal } from "../_shared/nfe_focus.ts";
+import { cancelarNFe, configFiscal, consultarNFe, diagnosticoFiscal, emitirNFe, emitirVendaDireta, processarFilaFiscal, statusFiscal } from "../_shared/nfe_focus.ts";
 import { executarReguasML } from "../_shared/reguas_ml.ts";
 
 const required: Record<string, string[]> = {
@@ -265,6 +265,7 @@ Deno.serve(handler(async (req) => {
     }
     case "fiscal_ler_produtos": return json(await detalhesFiscaisBling(db, ws, 150));
     case "fiscal_emitir": return json(await emitirNFe(db, ws, String(body.pedido ?? ""), user.email ?? user.id, body.producao === true));
+    case "fiscal_emitir_venda": return json(await emitirVendaDireta(db, ws, String(body.venda ?? ""), user.email ?? user.id, body.producao === true));
     case "fiscal_consultar": return json(await consultarNFe(db, ws, String(body.ref ?? "")));
     case "fiscal_cancelar": return json(await cancelarNFe(db, ws, String(body.ref ?? ""), String(body.justificativa ?? "")));
     case "estoque_sync": {
