@@ -396,3 +396,12 @@ tr.muted td{opacity:.6}
 
 /* ═══ Radar de margem ═══ */
 .mgbar{display:inline-block;width:80px;height:6px;background:var(--panel2);border-radius:4px;overflow:hidden;vertical-align:middle}.mgbar i{display:block;height:100%;background:var(--green)}.mgbar i.low{background:var(--gold)}.mgbar i.neg{background:var(--red)}
+
+/* ═══ Projeção do mês ═══ */
+.projcard{margin-bottom:16px;border-color:rgb(var(--ar) / 30%);background:radial-gradient(ellipse at 100% 0,rgb(var(--ar) / 12%),transparent 55%),var(--panel)}
+.projrow{display:flex;gap:28px;flex-wrap:wrap}.projrow small{display:block;color:var(--muted);font-size:11px}.projrow strong{font-size:24px;letter-spacing:-.5px}.projrow .accent{color:var(--accent)}
+.projbar{display:block;position:relative;height:10px;border-radius:6px;background:var(--panel2);margin-top:14px}.projbar i{display:block;height:100%;border-radius:6px;background:var(--accent)}.projbar b{position:absolute;top:-4px;width:3px;height:18px;background:var(--text);border-radius:2px}
+/* ═══ Copiloto do Início ═══ */
+.copiloto{margin-bottom:16px}.insights{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:10px}
+.insight{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:12px 14px;background:var(--panel2);transform:none}.insight:hover{transform:none;border-color:var(--accent)}.insight strong{font-size:18px}.insight small{color:var(--muted);font-size:11px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.chips button{border-radius:999px;font-size:12px;padding:7px 12px}
