@@ -359,3 +359,9 @@ tr.ctbnovo td{border-top:2px solid var(--line)}
 /* ═══ Fluxo de caixa ═══ */
 .fxtable td,.fxtable th{padding:9px 14px}.fxsec td{font-size:10px;text-transform:uppercase;letter-spacing:1.4px;color:var(--muted);padding-top:16px;border-top:0}
 .fxg td:first-child{font-weight:600}.fxc td:first-child{padding-left:34px;color:var(--muted);font-size:12px}
+
+/* ═══ Central de pendências ═══ */
+.pdgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.pdcard{display:flex;flex-direction:column;align-items:stretch;gap:8px;text-align:left;padding:18px;transform:none}.pdcard:hover{transform:none;border-color:rgb(var(--ar) / 55%)}
+.pdcard.ok{opacity:.72}.pdhead{display:flex;align-items:center;gap:10px}.pdhead strong{flex:1}.pdn{font-size:24px;font-weight:700}
+.pdfoot{display:flex;justify-content:space-between;gap:8px;font-weight:600}.pdacao{color:var(--accent);font-size:12px;font-weight:600}

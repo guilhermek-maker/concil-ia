@@ -67,6 +67,7 @@ function projetado(){const h=new Date().toLocaleDateString('sv-SE'),semanas=[...
 function view(){return `<div class="crmbar"><div class="segtabs">${[['realizado','Realizado (extrato)'],['projetado','Projetado (12 semanas)']].map(([a,t])=>`<button class="${ui.aba===a?'active':''}" data-fx-aba="${a}">${t}</button>`).join('')}</div></div>${ui.aba==='realizado'?realizado():projetado()}`}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-fx-aba],[data-fx-grupo]');if(!b)return;if(b.dataset.fxAba){ui.aba=b.dataset.fxAba;render()}if(b.dataset.fxGrupo){const g=b.dataset.fxGrupo;ui.abertos.has(g)?ui.abertos.delete(g):ui.abertos.add(g);render()}});
 function bind(){const f=$('#fxFut');if(f)f.onchange=()=>{ui.futuras=f.checked;render()};const s=$('[data-fx-meses]');if(s)s.onchange=()=>{ui.meses=Number(s.value);render()}}
+window.Fluxo={prazos};
 addPage('fluxo','cash','Fluxo de caixa',view,'Realizado mês a mês pelo extrato e projetado para 12 semanas: de onde vem e para onde vai o dinheiro.','',bind);
 if(navItems.filter(n=>n[0]==='fluxo').length>1)navItems.splice(navItems.map(n=>n[0]).lastIndexOf('fluxo'),1);
 })();
