@@ -344,3 +344,7 @@ body.light.tema-rose{--accent:#c23f7f;--ar:194 63 127;--ar2:194 63 127;--btn:#c2
 .ctb td{padding:9px 16px}.ctb .n2 td:first-child{padding-left:28px}.ctb .n3 td:first-child{padding-left:44px}.ctb .n4 td:first-child{padding-left:60px}
 .ctbgrupo td{font-weight:650;background:var(--panel2)}.ctbfinal td{border-top:2px solid var(--accent);font-size:14px}
 tr.ctbnovo td{border-top:2px solid var(--line)}
+
+/* ═══ Faturamento ═══ */
+.fatchart{width:100%;height:auto;display:block}.fatchart .fb{fill:rgb(var(--ar) / 18%)}.fatchart .fn{fill:var(--accent)}.fatchart text{fill:var(--muted);font-size:11px}
+.checklist{display:grid;gap:8px;margin:10px 0}.chk{display:flex;gap:10px;align-items:flex-start}.chk small{display:block;color:var(--muted);font-size:11px}
