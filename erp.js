@@ -19,14 +19,15 @@ const C=tipo=>(db.cadastros||(db.cadastros=[])).filter(c=>c.tipo===tipo);
 // ═════════════════ Estrutura ═════════════════
 const MODS=[
  {id:'ini',ic:'home',t:'Início',grupos:[['Hoje',['central']]]},
- {id:'ven',ic:'link',t:'Vendas',grupos:[['Painel',['dashboard']],['Conciliação',['reconcile','pending','closing']],['Integração',['integracoes','imports']]],plataformas:true},
- {id:'fin',ic:'wallet',t:'Financeiro',grupos:[['Contas a pagar',['lancamento','pagar','compras']],['Tesouraria',['tesouraria','concbanco']],['Caixa',['fluxo']]]},
+ {id:'ven',ic:'link',t:'Vendas',grupos:[['Acompanhar',['dashboard','reconcile','pending','closing']],['Pós-venda',['atendimento']],['Conexões',['integracoes']]]},
+ {id:'fin',ic:'wallet',t:'Financeiro',grupos:[['A pagar',['pagar','compras']],['Bancos',['tesouraria','concbanco']],['Caixa',['fluxo']]]},
  {id:'crm',ic:'heart',t:'CRM',grupos:[['CRM',['crm','crmclientes','crmprodutos','crmgeo','crmacoes']]]},
  {id:'cad',ic:'folder',t:'Cadastros',grupos:[['Parceiros',['fornecedores']],['Financeiro',['cadcontas','categorias','centros']],['Produtos',['cadprodutos']]]},
  {id:'res',ic:'chart',t:'Resultado',grupos:[['Contábil',['contabil']]]},
  {id:'pre',ic:'tag',t:'Preços',grupos:[['Formação de preço',['precos']]]},
  {id:'rel',ic:'print',t:'Relatórios',grupos:[['Relatórios',['relfin','reports']]]}];
-const GERAL=['equipe','ai','history'];
+const GERAL=['equipe','ai','history','auditoria','lancamento','imports'];
+for(const [id,t] of [['reconcile','Conciliação de vendas'],['pending','Pendências'],['closing','Fechamento do mês'],['tesouraria','Bancos e saldos'],['fluxo','Fluxo de caixa'],['pagar','Contas a pagar'],['compras','Notas de entrada']]){const n=navItems.find(x=>x[0]===id);if(n)n[2]=t}
 const modDe=p=>platforms[p]?'ven':MODS.find(m=>m.grupos.some(([,ids])=>ids.includes(p)))?.id;
 let modAtual=modDe(page)||'ini';
 const menuAberto=new Set((()=>{try{return JSON.parse(localStorage.getItem('eb_menu')||'[]')}catch{return []}})());
@@ -41,11 +42,12 @@ function avisos(){const c=contagens(),s=l=>money(round(l.reduce((a,t)=>a+saldoT(
  if(c.extrato)out.push(['info','swap',`${c.extrato} movimento(s) do extrato a conciliar`,'Conciliação bancária','concbanco']);
  if(c.notas)out.push(['info','receipt',`${c.notas} nota(s) de entrada nova(s)`,'Confira categorias e vencimentos','compras']);
  if(c.acessos)out.push(['warn','users',`${c.acessos} pedido(s) de acesso`,'Equipe e acessos','equipe']);
+ out.push(...(window.Atendimento?.avisos?.()||[]));
  return out}
 
 let paginaAnterior=null;
 shell=function(){const pm=modDe(page);if(pm)modAtual=pm;if(page!==paginaAnterior){paginaAnterior=page;menuSel=null}const M=MODS.find(m=>m.id===modAtual)||MODS[0],cur=nomePag(page),av=avisos();
- const item=id=>{const n=navItems.find(x=>x[0]===id);if(!n)return '';const c=contagens();const badge=id==='pagar'&&c.vencidos.length?c.vencidos.length:id==='concbanco'&&c.extrato?c.extrato:id==='equipe'&&c.acessos?c.acessos:0;
+ const item=id=>{const n=navItems.find(x=>x[0]===id);if(!n)return '';const c=contagens();const badge=id==='pagar'&&c.vencidos.length?c.vencidos.length:id==='concbanco'&&c.extrato?c.extrato:id==='equipe'&&c.acessos?c.acessos:id==='atendimento'?(window.Atendimento?.abertos?.()||0):0;
   return `<button data-nav="${id}" class="${page===id?'active':''}">${ico(n[1],17)}<span>${n[2]}</span>${badge?`<em class="navcount">${badge}</em>`:''}</button>`};
  const meses=[...new Set([month,...db.orders.map(o=>o.date.slice(0,7)),...P().map(t=>t.vencimento.slice(0,7))])].filter(m=>m>='2020').sort().reverse().slice(0,36);
  const emp=esc(window.Cloud?.wsName||'Minha empresa');
@@ -80,10 +82,10 @@ document.addEventListener('click',e=>{const dm=e.target.closest('.dropmenu');con
   const nomeCompleto=(window.Cloud?.session?.user?.user_metadata?.nome||'').trim();drop(`<div class="userhead"><span class="avatar big">${esc((nomeCompleto||email).slice(0,2).toUpperCase()||'EB')}</span><span><strong>${esc(nomeCompleto||email||'Modo local')}</strong><small>${esc(nomeCompleto?email:'')}</small><small>${window.Cloud?.role==='owner'?'Administrador':'Membro'} · ${esc(window.Cloud?.wsName||'')}</small></span></div>
   <button class="dropitem" data-nav="equipe">${ico('users',18)}<span><strong>Equipe e acessos</strong><small>Liberar usuários e papéis</small></span>${n?`<em class="navcount">${n}</em>`:''}</button>
   ${window.Cloud?.ws?`<button class="dropitem" data-erp-nome="1">${ico('edit',18)}<span><strong>Alterar meu nome</strong><small>Como você aparece no portal</small></span></button>`:''}
-  <button class="dropitem" data-nav="history">${ico('clock',18)}<span><strong>Histórico e auditoria</strong><small>Quem fez o quê, e quando</small></span></button>
+  <button class="dropitem" data-nav="auditoria">${ico('shield',18)}<span><strong>Log e auditoria</strong><small>Cada inclusão, alteração e exclusão, com quem e quando</small></span></button>
   <button class="dropitem" data-nav="integracoes">${ico('plug',18)}<span><strong>Integrações</strong><small>Bling e marketplaces</small></span></button>
   ${wss.length>1?wss.map(w=>`<button class="dropitem" data-erp-ws="${esc(w.id)}">${ico('folder',18)}<span><strong>${esc(w.name)}</strong><small>${w.id===Cloud.ws?'empresa aberta':'trocar para esta empresa'}</small></span></button>`).join(''):''}
-  <button class="dropitem" data-action="theme">${ico(db.theme==='light'?'moon':'sun',18)}<span><strong>Tema ${db.theme==='light'?'escuro':'claro'}</strong><small>Mudar a aparência</small></span></button>
+  <button class="dropitem" data-erp-tema="1">${ico(db.theme==='light'?'moon':'sun',18)}<span><strong>Aparência</strong><small>Temas, cores e modo claro/escuro</small></span></button>
   ${window.Cloud?.ws?`<button class="dropitem" data-cloud="logout">${ico('logout',18)}<span><strong>Sair</strong><small>Encerrar a sessão</small></span></button>`:''}`,b)}
 });
 document.addEventListener('click',e=>{const g=e.target.closest('[data-erp-go]');if(g){const k=g.dataset.erpGo;$('#erpdrop').innerHTML='';if(k==='@extrato'){const i=document.createElement('input');i.type='file';i.multiple=true;i.accept='.ofx,.OFX,.csv,.xlsx,.xls';i.onchange=()=>Tesouraria.importarArquivos(i.files);i.click()}if(k==='@forn'){cadUI('fornecedores').modo='ficha';cadUI('fornecedores').id=null;navigate('fornecedores')}if(k==='@conta'){cadUI('cadcontas').modo='ficha';cadUI('cadcontas').id=null;navigate('cadcontas')}}
