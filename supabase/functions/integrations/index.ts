@@ -7,6 +7,7 @@ import { persist, provider, providers, validSecret } from "../_shared/store.ts";
 import { importShopeeIncome } from "../_shared/shopee_central.ts";
 import { responderML, sincronizarAtendimentoML } from "../_shared/atendimento_ml.ts";
 import { sugerirAtendimento } from "../_shared/atendimento_ia.ts";
+import { sincronizarEstoqueBling } from "../_shared/estoque_bling.ts";
 
 const required: Record<string, string[]> = {
   bling: ["BLING_CLIENT_ID", "BLING_CLIENT_SECRET"],
@@ -18,6 +19,7 @@ const BUDGET_MS = 110_000; // Edge Functions encerram em ~150 s; paramos antes e
 const LOCK_MS = 140_000;
 const HOURLY_MS = 60 * 60_000;
 const ATENDIMENTO_MS = 10 * 60_000; // reclamações, perguntas e mensagens: a cada 10 minutos
+const ESTOQUE_MS = 60 * 60_000; // produtos, custo e saldo do Bling: de hora em hora
 
 type Db = ReturnType<typeof admin>;
 interface Job { from: string; to: string; fases?: string[]; cursor: unknown; locked_until?: number | null; started_at?: string; saved?: Record<string, number> }
@@ -144,6 +146,14 @@ Deno.serve(handler(async (req) => {
         report.push({ workspace_id: i.workspace_id, atendimento: r });
       } catch (e) { report.push({ workspace_id: i.workspace_id, atendimento_erro: String(e) }); }
     }
+    // Estoque (Bling): produtos, custo e saldo.
+    for (const i of list.filter((x) => x.provider === "bling" && (!x.settings?.estoque?.fim || Date.now() - new Date(x.settings.estoque.fim).getTime() > ESTOQUE_MS))) {
+      try {
+        const r = await sincronizarEstoqueBling(db, i.workspace_id, Math.min(deadline - 20_000, Date.now() + 60_000));
+        await writeSettings(db, i.workspace_id, i.provider, (s) => { s.estoque = { ...r, fim: new Date().toISOString() }; });
+        report.push({ workspace_id: i.workspace_id, estoque: r });
+      } catch (e) { report.push({ workspace_id: i.workspace_id, estoque_erro: String(e) }); }
+    }
     for (const [n, i] of list.entries()) {
       if (Date.now() > deadline - 15_000) break;
       const slot = Math.min(deadline, Date.now() + (deadline - Date.now()) / (list.length - n));
@@ -210,6 +220,11 @@ Deno.serve(handler(async (req) => {
         socios: (c.members ?? []).map((m: any) => `${m.person?.name ?? ""}${m.role?.text ? " · " + m.role.text : ""}`).join("\n"),
         suframa: o.suframa?.[0]?.number ?? "", receitaEm: new Date().toISOString().slice(0, 10),
       });
+    }
+    case "estoque_sync": {
+      const r = await sincronizarEstoqueBling(db, ws);
+      await writeSettings(db, ws, "bling", (s) => { s.estoque = { ...r, fim: new Date().toISOString() }; });
+      return json(r);
     }
     case "atendimento_sync": {
       const r = await sincronizarAtendimentoML(db, ws);
