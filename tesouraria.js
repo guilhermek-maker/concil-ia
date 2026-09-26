@@ -187,5 +187,5 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-reg],[data
  if(d.reg==='criar-achadas'){const sel=$$('[data-reg-achada]').filter(c=>c.checked).map(c=>ui.achadas[Number(c.dataset.regAchada)]);let n=0;
   for(const a of sel){(db.cadastros||(db.cadastros=[])).push({id:'reg-'+uid(),tipo:'regra',ativo:true,dados:{padrao:a.padrao,sentido:a.sentido,tipo:a.tipo,categoria:a.categoria||null,fornecedor:a.fornecedor||'',destino:a.destino||'',exemplo:a.exemplo,criadaEm:new Date().toISOString().slice(0,10),origem:'histórico'}});n++}
   audit('Regras de conciliação criadas pelo histórico',`${n} regra(s)`);save();toast(`${n} regra(s) criada(s).`);regrasView();render();return}});
-window.Tesouraria={saldos,importarArquivos,sugerir,regras,padraoDe};
+window.Tesouraria={saldos,saldoConta,importarArquivos,sugerir,regras,padraoDe};
 })();
