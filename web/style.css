@@ -375,3 +375,13 @@ tr.ctbnovo td{border-top:2px solid var(--line)}
 
 /* ═══ Celular: abas de filtro rolam na horizontal em vez de vazar ═══ */
 .crmbar .segtabs{max-width:100%;overflow-x:auto;scrollbar-width:thin}.crmbar .segtabs button{flex:none}
+
+/* ═══ Parametrização fiscal e contábil ═══ */
+.pfhero{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:18px 22px;border:1px solid rgb(var(--ar) / 30%);border-radius:14px;background:radial-gradient(ellipse at 90% -30%,rgb(var(--ar) / 18%),transparent 60%),var(--panel);margin-bottom:16px}
+.pfhero h2{font-size:20px}.pfprog{min-width:180px;text-align:right}.pfprog strong{font-size:24px;display:block}.pfprog small{color:var(--muted);font-size:11px}.pfprog .bartrack{display:block;margin-top:6px}
+.pfgrid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px;align-items:start}.pfmain{display:grid;gap:16px;min-width:0}
+.pfnav{display:flex;flex-direction:column;gap:4px;padding:10px;position:sticky;top:12px}.pfnav button{justify-content:flex-start;border:0;background:transparent;text-align:left;padding:10px 12px;transform:none}.pfnav button.active{background:rgb(var(--ar) / 12%);color:var(--text)}.pfnav .icon{width:16px;height:16px}
+.aprov{margin-top:16px;padding:12px 14px;border-radius:10px;border:1px dashed #edc47b66;background:#edc47b0d;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}.aprov.ok{border:1px solid rgb(var(--ar) / 30%);background:rgb(var(--ar) / 7%)}.aprov .icon{width:16px;height:16px}
+.uftable td{padding:7px 12px}.ufin{width:74px;text-align:right;padding:6px 8px}
+.simcard{border-color:rgb(var(--ar) / 35%)}.simres{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;margin-top:12px}.simres>div{background:var(--panel2);border-radius:10px;padding:10px 12px}.simres small{display:block;color:var(--muted);font-size:11px}.simres strong{font-size:16px}.simres .simtot{background:rgb(var(--ar) / 12%)}
+@media(max-width:900px){.pfgrid{grid-template-columns:1fr}.pfnav{position:static;flex-direction:row;overflow-x:auto}.simres{grid-template-columns:repeat(2,1fr)}.pfhero{flex-direction:column;align-items:flex-start}.pfprog{text-align:left}}

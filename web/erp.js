@@ -23,7 +23,7 @@ const MODS=[
  {id:'est',ic:'box',t:'Estoque',grupos:[['Estoque',['estoque','estcompras']]]},
  {id:'fin',ic:'wallet',t:'Financeiro',grupos:[['A pagar',['pagar','compras']],['Bancos',['tesouraria','concbanco']],['Caixa',['fluxo']]]},
  {id:'crm',ic:'heart',t:'CRM',grupos:[['CRM',['crm','crmclientes','crmfases','crmacoes']],['Análises',['crmprodutos','crmgeo']],['Automação',['crmreguas']]]},
- {id:'cad',ic:'folder',t:'Cadastros',grupos:[['Parceiros',['fornecedores']],['Financeiro',['cadcontas','categorias','centros']],['Produtos',['cadprodutos']]]},
+ {id:'cad',ic:'folder',t:'Cadastros',grupos:[['Parceiros',['fornecedores']],['Financeiro',['cadcontas','categorias','centros']],['Produtos',['cadprodutos']],['Fiscal e contábil',['parametros']]]},
  {id:'res',ic:'chart',t:'Resultado',grupos:[['Contabilidade',['contabauto','contabil']]]},
  {id:'pre',ic:'tag',t:'Preços',grupos:[['Formação de preço',['precos']]]},
  {id:'rel',ic:'print',t:'Relatórios',grupos:[['Relatórios',['relfin','reports']]]}];
@@ -47,14 +47,14 @@ function avisos(){const c=contagens(),s=l=>money(round(l.reduce((a,t)=>a+saldoT(
  return out}
 
 let paginaAnterior=null;
-shell=function(){const pm=modDe(page);if(pm)modAtual=pm;if(page!==paginaAnterior){paginaAnterior=page;menuSel=null}const M=MODS.find(m=>m.id===modAtual)||MODS[0],cur=nomePag(page),av=avisos();
+shell=function(){{const mp=modDe(page);if(mp&&window.Perfis&&!Perfis.moduloVisivel(mp)){page=Perfis.inicio()}}const pm=modDe(page);if(pm)modAtual=pm;if(page!==paginaAnterior){paginaAnterior=page;menuSel=null}const M=MODS.find(m=>m.id===modAtual)||MODS[0],cur=nomePag(page),av=avisos();
  const item=id=>{const n=navItems.find(x=>x[0]===id);if(!n)return '';const c=contagens();const badge=id==='pagar'&&c.vencidos.length?c.vencidos.length:id==='concbanco'&&c.extrato?c.extrato:id==='equipe'&&c.acessos?c.acessos:id==='atendimento'?(window.Atendimento?.abertos?.()||0):0;
   return `<button data-nav="${id}" class="${page===id?'active':''}">${ico(n[1],17)}<span>${n[2]}</span>${badge?`<em class="navcount">${badge}</em>`:''}</button>`};
  const meses=[...new Set([month,...db.orders.map(o=>o.date.slice(0,7)),...P().map(t=>t.vencimento.slice(0,7))])].filter(m=>m>='2020'&&m<=addMeses(hoje(),3).slice(0,7)).sort().reverse().slice(0,36);
  const emp=esc(window.Cloud?.wsName||'Minha empresa');
  $('#app').innerHTML=`<div class="erp">
  <aside class="side"><button class="sidebrand" data-nav="central" aria-label="Início"><img class="sidelogo" src="brand/comprastore-logo-240.png" alt=""><span><strong>${emp}</strong><small>EcomBalance · ERP</small></span></button>
-  <nav class="menu" aria-label="Menu principal">${MODS.map(m=>{const ids=m.grupos.flatMap(([,l])=>l).filter(id=>navItems.some(n=>n[0]===id)),unico=ids.length===1&&!m.plataformas,ativo=m.id===M.id,aberto=(menuSel??M.id)===m.id;
+  <nav class="menu" aria-label="Menu principal">${MODS.filter(m=>window.Perfis?.moduloVisivel?.(m.id)!==false).map(m=>{const ids=m.grupos.flatMap(([,l])=>l).filter(id=>navItems.some(n=>n[0]===id)),unico=ids.length===1&&!m.plataformas,ativo=m.id===M.id,aberto=(menuSel??M.id)===m.id;
    if(unico)return `<button class="mhead ${page===ids[0]?'active':''}" data-nav="${ids[0]}">${ico(m.ic,20)}<span>${m.t}</span></button>`;
    return `<div class="mgroup ${aberto?'open':''} ${ativo?'cur':''}"><button class="mhead" data-mtoggle="${m.id}" aria-expanded="${aberto}">${ico(m.ic,20)}<span>${m.t}</span>${ico('chev',15)}</button>${aberto?`<div class="mitems">${ids.map(item).join('')}${m.plataformas?Object.keys(platforms).map(p=>`<button data-nav="${p}" class="${page===p?'active':''}"><span class="platdot" style="background:${platforms[p].color}"></span><span>${p}</span></button>`).join(''):''}</div>`:''}</div>`}).join('')}</nav></aside>
  <main><header><button class="quiet mobilemenu" data-action="menu" aria-label="Abrir navegação">${icon('menu')}</button>
@@ -80,7 +80,7 @@ document.addEventListener('click',e=>{const dm=e.target.closest('.dropmenu');con
  if(a==='empresa')drop(`<div class="drophead">${esc(window.Cloud?.wsName||'Empresa')}</div>${(window.Cloud?.workspaces||[]).length>1?Cloud.workspaces.map(w=>`<button class="dropitem" data-erp-ws="${esc(w.id)}"><span><strong>${esc(w.name)}</strong><small>${w.id===Cloud.ws?'aberta':''}</small></span></button>`).join(''):''}<button class="dropitem" data-nav="equipe">${ico('users',18)}<span><strong>Equipe e acessos</strong><small>Liberar usuários</small></span></button><button class="dropitem" data-nav="integracoes">${ico('plug',18)}<span><strong>Integrações</strong><small>Bling, marketplaces</small></span></button>`,b);
  if(a==='busca')busca();
  if(a==='usuario'){const email=window.Cloud?.session?.user?.email||'',n=contagens().acessos,wss=window.Cloud?.workspaces||[];
-  const nomeCompleto=(window.Cloud?.session?.user?.user_metadata?.nome||'').trim();drop(`<div class="userhead"><span class="avatar big">${esc((nomeCompleto||email).slice(0,2).toUpperCase()||'EB')}</span><span><strong>${esc(nomeCompleto||email||'Modo local')}</strong><small>${esc(nomeCompleto?email:'')}</small><small>${window.Cloud?.role==='owner'?'Administrador':'Membro'} · ${esc(window.Cloud?.wsName||'')}</small></span></div>
+  const nomeCompleto=(window.Cloud?.session?.user?.user_metadata?.nome||'').trim();drop(`<div class="userhead"><span class="avatar big">${esc((nomeCompleto||email).slice(0,2).toUpperCase()||'EB')}</span><span><strong>${esc(nomeCompleto||email||'Modo local')}</strong><small>${esc(nomeCompleto?email:'')}</small><small>${esc(window.Perfis?.nome?.()||'')} · ${esc(window.Cloud?.wsName||'')}</small></span></div>
   <button class="dropitem" data-nav="equipe">${ico('users',18)}<span><strong>Equipe e acessos</strong><small>Liberar usuários e papéis</small></span>${n?`<em class="navcount">${n}</em>`:''}</button>
   ${window.Cloud?.ws?`<button class="dropitem" data-erp-nome="1">${ico('edit',18)}<span><strong>Alterar meu nome</strong><small>Como você aparece no portal</small></span></button>`:''}
   <button class="dropitem" data-nav="auditoria">${ico('shield',18)}<span><strong>Log e auditoria</strong><small>Cada inclusão, alteração e exclusão, com quem e quando</small></span></button>

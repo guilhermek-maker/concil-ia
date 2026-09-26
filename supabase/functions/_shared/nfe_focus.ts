@@ -19,15 +19,44 @@ const INTER_7 = new Set(["AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "
 const INTERMEDIADOR: Record<string, string> = { "Mercado Livre": "03007331000141", "Shopee": "35635824000112", "Magalu": "47960950000121" };
 
 export const PADRAO_FISCAL = {
-  ambiente: "homologacao" as Amb, cnpj: "65193225000157", uf: "SC", serie: "2", natureza: "Venda de mercadoria",
-  cfop_interno: "5102", cfop_interestadual: "6108", cst_icms: "00", aliq_icms_interna: 17,
-  cst_pis: "01", aliq_pis: 0.65, cst_cofins: "01", aliq_cofins: 3, modalidade_frete: 0, difal: true, origem_padrao: 0,
+  ambiente: "homologacao" as Amb, cnpj: "65193225000157", uf: "SC", serie: "2", natureza: "Venda de Mercadoria - NAO CONTRIBUINTE",
+  natureza_contribuinte: "Venda de Mercadoria - CONTRIBUINTE", cfop_interno: "5102", cfop_interestadual: "6108", cfop_interestadual_contribuinte: "6102",
+  cst_icms: "00", aliq_icms_interna: 17, cst_pis: "01", aliq_pis: 0.65, cst_cofins: "01", aliq_cofins: 3, modalidade_frete: 0, difal: true, origem_padrao: 5,
+  presenca: 9, forma_pagamento: "20", ibpt_federal: 17.1, ibpt_estadual: 17, texto_difal: true, texto_adicional: "",
+  // PIS/COFINS sem o ICMS na base (tese do século, como o Bling faz) e Reforma Tributária (LC 214/2025, ano-teste 2026).
+  pis_exclui_icms: true, ibs_cst: "000", ibs_cclass: "000001", aliq_cbs: 0.9, aliq_ibs_uf: 0.1, aliq_ibs_mun: 0,
 };
-export type Fiscal = typeof PADRAO_FISCAL & { aliquotas?: Record<string, number> };
+// Regras por UF (alíquota interna do destino, FCP e DIFAL) e intermediadores (CNPJ + identificador da loja).
+export type Fiscal = typeof PADRAO_FISCAL & { aliquotas?: Record<string, number>; por_uf?: Record<string, { interna?: number; fcp?: number; difal?: boolean; inter?: number }>; intermediadores?: Record<string, { cnpj?: string; id?: string }> };
+const FCP_PADRAO: Record<string, number> = { AL: 1, RJ: 2 };
+// Res. SF 13/2012: origem 1, 2, 3 e 8 (conteúdo importado > 40%) têm ICMS interestadual de 4%.
+const IMPORTADO = new Set([1, 2, 3, 8]);
+export function aliqInterestadual(ufDest: string, origem: number, cfg?: Fiscal) {
+  const f = cfg?.por_uf?.[ufDest]?.inter;
+  if (IMPORTADO.has(Number(origem))) return 4;
+  if (f) return f;
+  return INTER_7.has(ufDest) ? 7 : 12;
+}
 
 export async function configFiscal(db: SupabaseClient, ws: string): Promise<Fiscal> {
   const { data } = await db.from("workspace_settings").select("data").eq("workspace_id", ws).maybeSingle();
-  return { ...PADRAO_FISCAL, ...(data?.data?.gerencial?.fiscal ?? {}) };
+  const cfg: Fiscal = { ...PADRAO_FISCAL, ...(data?.data?.gerencial?.fiscal ?? {}) };
+  // Sem valor salvo pela contabilidade, usa o que o Bling pratica hoje (lido das notas autorizadas).
+  const { data: bl } = await db.from("integrations").select("settings").eq("workspace_id", ws).eq("provider", "bling").maybeSingle();
+  const rb = bl?.settings?.regras_fiscais;
+  if (rb) {
+    cfg.intermediadores = { ...(cfg.intermediadores ?? {}) };
+    for (const [plat, cnpj] of Object.entries(INTERMEDIADOR)) {
+      const atual = cfg.intermediadores[plat] ?? {};
+      if (!atual.id && rb.intermediadores?.[cnpj]) cfg.intermediadores[plat] = { cnpj, id: rb.intermediadores[cnpj] };
+    }
+    cfg.por_uf = { ...(cfg.por_uf ?? {}) };
+    for (const [uf, r] of Object.entries(rb.por_uf ?? {}) as [string, any][]) {
+      const atual = cfg.por_uf[uf] ?? {};
+      cfg.por_uf[uf] = { ...atual, interna: atual.interna ?? (r.pICMSUFDest != null ? Number(r.pICMSUFDest) : undefined), fcp: atual.fcp ?? (r.pFCPUFDest != null ? Number(r.pFCPUFDest) : undefined) };
+    }
+  }
+  return cfg;
 }
 
 export function statusFiscal(cfg: Fiscal) {
@@ -56,8 +85,10 @@ async function montar(db: SupabaseClient, ws: string, cfg: Fiscal, pedido: any) 
   const P = new Map((prods ?? []).map((p) => [p.id, p]));
   const semNcm = skus.filter((s) => !P.get(s)?.ncm);
   if (semNcm.length) throw new HttpError(400, `Produto(s) sem NCM: ${semNcm.join(", ")}. Leia os dados fiscais do Bling (Estoque › Atualizar) ou cadastre o NCM.`);
-  const interno = uf === cfg.uf, inter = interno ? cfg.aliq_icms_interna : (INTER_7.has(uf) ? 7 : 12);
-  const aliqDest = (cfg.aliquotas ?? {})[uf] ?? ALIQ_INTERNA[uf] ?? 18;
+  const interno = uf === cfg.uf, regraUF = cfg.por_uf?.[uf] ?? {};
+  const aliqDest = regraUF.interna ?? (cfg.aliquotas ?? {})[uf] ?? ALIQ_INTERNA[uf] ?? 18, fcpDest = regraUF.fcp ?? FCP_PADRAO[uf] ?? 0;
+  const difalUF = regraUF.difal ?? cfg.difal;
+  let difalTotal = 0, tributosAprox = 0;
   const homolog = cfg.ambiente === "homologacao";
   const soma = round(itens.reduce((s, i) => s + Number(i.qty) * Number(i.price), 0));
   const frete = round(Math.max(0, Number(pedido.gross) - soma));
@@ -66,37 +97,59 @@ async function montar(db: SupabaseClient, ws: string, cfg: Fiscal, pedido: any) 
     const p = P.get(String(i.sku).trim())!, q = Number(i.qty), vu = round(Number(i.price)), vb = round(q * vu);
     // Frete rateado no item (entra na base do ICMS).
     const fr = frete && soma ? round(frete * vb / soma) : 0, base = round(vb + fr);
+    const orig = Number(p.origem ?? cfg.origem_padrao), inter = interno ? cfg.aliq_icms_interna : aliqInterestadual(uf, orig, cfg);
+    tributosAprox += base * (cfg.ibpt_federal + cfg.ibpt_estadual) / 100;
+    // Cálculo idêntico ao do Bling (conferido ao centavo em 5 notas): ICMS → DIFAL/FCP → PIS/COFINS sem ICMS → IBS/CBS sem PIS/COFINS.
+    const vIcms = round(base * inter / 100);
+    const temDifal = !interno && difalUF && doc.length !== 14;
+    const vDifal = temDifal ? round(base * Math.max(0, aliqDest - inter) / 100) : 0, vFcp = temDifal ? round(base * fcpDest / 100) : 0;
+    const basePis = round(cfg.pis_exclui_icms ? base - vIcms - vDifal - vFcp : base);
+    const vPis = round(basePis * cfg.aliq_pis / 100), vCofins = round(basePis * cfg.aliq_cofins / 100);
+    const baseIbs = round(basePis - vPis - vCofins), vCbs = round(baseIbs * cfg.aliq_cbs / 100), vIbsUf = round(baseIbs * cfg.aliq_ibs_uf / 100), vIbsMun = round(baseIbs * cfg.aliq_ibs_mun / 100);
     const it: Record<string, unknown> = {
       numero_item: n + 1, codigo_produto: i.sku, descricao: n === 0 && homolog ? "NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL" : String(i.title ?? p.nome).slice(0, 120),
       cfop: interno ? cfg.cfop_interno : cfg.cfop_interestadual, codigo_ncm: p.ncm, ...(p.cest ? { cest: p.cest } : {}),
       codigo_barras_comercial: p.gtin || "SEM GTIN", codigo_barras_tributavel: p.gtin || "SEM GTIN",
       unidade_comercial: "UN", quantidade_comercial: q, valor_unitario_comercial: vu, unidade_tributavel: "UN", quantidade_tributavel: q, valor_unitario_tributavel: vu,
       valor_bruto: vb, ...(fr ? { valor_frete: fr } : {}), inclui_no_total: 1,
-      icms_origem: p.origem ?? cfg.origem_padrao, icms_situacao_tributaria: cfg.cst_icms,
-      icms_modalidade_base_calculo: 3, icms_base_calculo: base, icms_aliquota: inter, icms_valor: round(base * inter / 100),
-      pis_situacao_tributaria: cfg.cst_pis, pis_base_calculo: base, pis_aliquota_porcentual: cfg.aliq_pis, pis_valor: round(base * cfg.aliq_pis / 100),
-      cofins_situacao_tributaria: cfg.cst_cofins, cofins_base_calculo: base, cofins_aliquota_porcentual: cfg.aliq_cofins, cofins_valor: round(base * cfg.aliq_cofins / 100),
+      icms_origem: orig, icms_situacao_tributaria: cfg.cst_icms,
+      icms_modalidade_base_calculo: 3, icms_base_calculo: base, icms_aliquota: inter, icms_valor: vIcms,
+      pis_situacao_tributaria: cfg.cst_pis, pis_base_calculo: basePis, pis_aliquota_porcentual: cfg.aliq_pis, pis_valor: vPis,
+      cofins_situacao_tributaria: cfg.cst_cofins, cofins_base_calculo: basePis, cofins_aliquota_porcentual: cfg.aliq_cofins, cofins_valor: vCofins,
+      ibs_cbs_situacao_tributaria: cfg.ibs_cst, ibs_cbs_classificacao_tributaria: cfg.ibs_cclass, ibs_cbs_base_calculo: baseIbs,
+      ibs_uf_aliquota: cfg.aliq_ibs_uf, ibs_uf_valor: vIbsUf, ibs_mun_aliquota: cfg.aliq_ibs_mun, ibs_mun_valor: vIbsMun, ibs_valor_total: round(vIbsUf + vIbsMun),
+      cbs_aliquota: cfg.aliq_cbs, cbs_valor: vCbs,
     };
-    // DIFAL (EC 87/2015): venda interestadual a consumidor final não contribuinte — 100% para o destino.
-    if (!interno && cfg.difal && doc.length !== 14) Object.assign(it, {
-      icms_base_calculo_uf_destino: base, icms_aliquota_interna_uf_destino: aliqDest, icms_aliquota_interestadual: inter,
-      icms_percentual_partilha: 100, icms_valor_uf_destino: round(base * Math.max(0, aliqDest - inter) / 100), icms_valor_uf_remetente: 0,
-    });
+    // DIFAL (EC 87/2015 e LC 190/2022): venda interestadual a consumidor final não contribuinte — 100% para o destino.
+    if (temDifal) {
+      difalTotal += vDifal + vFcp;
+      Object.assign(it, {
+        icms_base_calculo_uf_destino: base, icms_aliquota_interna_uf_destino: aliqDest, icms_aliquota_interestadual: inter,
+        icms_percentual_partilha: 100, icms_valor_uf_destino: vDifal, icms_valor_uf_remetente: 0,
+        ...(fcpDest ? { fcp_base_calculo_uf_destino: base, fcp_percentual_uf_destino: fcpDest, fcp_valor_uf_destino: vFcp } : {}),
+      });
+    }
     return it;
   });
-  const cnpjInt = INTERMEDIADOR[pedido.platform];
+  const intermed = cfg.intermediadores?.[pedido.platform] ?? {}, cnpjInt = dig(intermed.cnpj || INTERMEDIADOR[pedido.platform] || "");
+  const idInt = String(intermed.id ?? "").trim();
+  if (cnpjInt && !idInt) throw new HttpError(400, `Informe o identificador da loja no intermediador (${pedido.platform}) na Parametrização fiscal.`);
+  const obs = [cfg.texto_difal && difalTotal ? `Valor do ICMS DIFAL para UF de destino R$ ${difalTotal.toFixed(2).replace(".", ",")}` : "",
+    `Total aproximado de tributos: R$ ${tributosAprox.toFixed(2).replace(".", ",")} (${(cfg.ibpt_federal + cfg.ibpt_estadual).toFixed(2).replace(".", ",")}%) - Federais ${String(cfg.ibpt_federal).replace(".", ",")}% Estaduais ${String(cfg.ibpt_estadual).replace(".", ",")}%. Fonte IBPT.`,
+    cfg.texto_adicional || ""].filter(Boolean).join(" | ");
   return {
     natureza_operacao: cfg.natureza, data_emissao: new Date().toISOString(), tipo_documento: 1, finalidade_emissao: 1,
-    local_destino: interno ? 1 : 2, consumidor_final: 1, presenca_comprador: 2, modalidade_frete: cfg.modalidade_frete,
+    local_destino: interno ? 1 : 2, consumidor_final: 1, presenca_comprador: Number(cfg.presenca), modalidade_frete: Number(cfg.modalidade_frete),
     cnpj_emitente: dig(cfg.cnpj), serie: cfg.serie,
     nome_destinatario: homolog ? "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL" : String(cli.name ?? "").slice(0, 60),
     ...(doc.length === 14 ? { cnpj_destinatario: doc } : { cpf_destinatario: doc }), indicador_inscricao_estadual_destinatario: 9,
     logradouro_destinatario: String(end.endereco).slice(0, 60), numero_destinatario: String(end.numero || "S/N").slice(0, 60),
     ...(end.complemento ? { complemento_destinatario: String(end.complemento).slice(0, 60) } : {}), bairro_destinatario: String(end.bairro || "Centro").slice(0, 60),
     municipio_destinatario: end.municipio, uf_destinatario: uf, cep_destinatario: dig(end.cep), pais_destinatario: "Brasil",
-    ...(cnpjInt ? { indicador_intermediario: 1, cnpj_intermediador: cnpjInt, id_intermediador: String(pedido.id).slice(0, 60) } : { indicador_intermediario: 0 }),
+    ...(cnpjInt ? { indicador_intermediario: 1, cnpj_intermediario: cnpjInt, id_intermediario: idInt.slice(0, 60) } : { indicador_intermediario: 0 }),
+    informacoes_adicionais_contribuinte: obs.slice(0, 2000),
     ...(frete ? { valor_frete: frete } : {}),
-    formas_pagamento: [{ forma_pagamento: "99", descricao_pagamento: `Pagamento via ${pedido.platform ?? "marketplace"}`, valor_pagamento: round(Number(pedido.gross)) }],
+    formas_pagamento: [{ forma_pagamento: String(cfg.forma_pagamento), valor_pagamento: round(Number(pedido.gross)) }],
     items,
   };
 }
@@ -148,4 +201,34 @@ export async function cancelarNFe(db: SupabaseClient, ws: string, ref: string, j
   await db.from("notas_fiscais").update({ status, mensagem: r.j?.mensagem_sefaz ?? r.j?.mensagem ?? null, updated_at: new Date().toISOString() }).eq("workspace_id", ws).eq("ref", ref);
   if (!r.ok) throw new HttpError(400, `Cancelamento recusado: ${r.j?.mensagem ?? r.status}`);
   return { ref, status };
+}
+
+/** Diagnóstico: para qual ambiente cada token gravado vale (consulta uma referência inexistente: 404 = token válido). */
+export async function diagnosticoFiscal() {
+  const out: Record<string, unknown> = {};
+  for (const [nome, tk] of [["FOCUS_NFE_TOKEN_HOMOLOGACAO", Deno.env.get("FOCUS_NFE_TOKEN_HOMOLOGACAO")], ["FOCUS_NFE_TOKEN", Deno.env.get("FOCUS_NFE_TOKEN")]] as const) {
+    if (!tk) { out[nome] = "não gravado"; continue; }
+    const r: Record<string, number> = {};
+    for (const [amb, base] of Object.entries(BASE)) {
+      const x = await fetch(`${base}/v2/nfe/EB-DIAGNOSTICO-INEXISTENTE`, { headers: { Authorization: "Basic " + btoa(`${tk}:`) } }).catch(() => null);
+      r[amb] = x?.status ?? 0;
+      await x?.body?.cancel();
+    }
+    out[nome] = r;
+  }
+  return out;
+}
+/** Emissão de teste pedida pelo suporte (fila em integrations.settings.fiscal_fila do Bling). Só homologação. */
+export async function processarFilaFiscal(db: SupabaseClient, ws: string, fila: string[]) {
+  const cfg = await configFiscal(db, ws);
+  if (cfg.ambiente !== "homologacao") return { pulado: "fila só roda em homologação" };
+  const res: Record<string, unknown>[] = [];
+  for (const pedido of fila.slice(0, 6)) {
+    try {
+      const r = await emitirNFe(db, ws, pedido, "Teste automático (homologação)");
+      if (r.status !== "erro") { await sleep(6000); res.push({ pedido, ...(await consultarNFe(db, ws, r.ref)) }); }
+      else res.push({ pedido, ...r });
+    } catch (e) { res.push({ pedido, erro: String((e as Error).message ?? e) }); }
+  }
+  return res;
 }

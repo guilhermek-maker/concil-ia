@@ -8,7 +8,8 @@ import { importShopeeIncome } from "../_shared/shopee_central.ts";
 import { responderML, sincronizarAtendimentoML } from "../_shared/atendimento_ml.ts";
 import { sugerirAtendimento } from "../_shared/atendimento_ia.ts";
 import { detalhesFiscaisBling, sincronizarEstoqueBling } from "../_shared/estoque_bling.ts";
-import { cancelarNFe, configFiscal, consultarNFe, emitirNFe, statusFiscal } from "../_shared/nfe_focus.ts";
+import { lerRegrasFiscaisBling } from "../_shared/regras_bling.ts";
+import { cancelarNFe, configFiscal, consultarNFe, diagnosticoFiscal, emitirNFe, processarFilaFiscal, statusFiscal } from "../_shared/nfe_focus.ts";
 import { executarReguasML } from "../_shared/reguas_ml.ts";
 
 const required: Record<string, string[]> = {
@@ -148,6 +149,24 @@ Deno.serve(handler(async (req) => {
         report.push({ workspace_id: i.workspace_id, atendimento: r });
       } catch (e) { report.push({ workspace_id: i.workspace_id, atendimento_erro: String(e) }); }
     }
+    // Fiscal: diagnóstico dos tokens e fila de notas de teste (homologação), pedidos pelo suporte em settings do Bling.
+    // Regras fiscais praticadas hoje pelo Bling (lidas do XML das notas de venda): pedido manual ou 1x por semana.
+    for (const i of list.filter((x) => x.provider === "bling" && (x.settings?.regras_pedido || !x.settings?.regras_fiscais?.em || Date.now() - new Date(x.settings.regras_fiscais.em).getTime() > 7 * 86400_000))) {
+      try {
+        const r = await lerRegrasFiscaisBling(db, i.workspace_id, Math.min(deadline - 25_000, Date.now() + 80_000));
+        await writeSettings(db, i.workspace_id, i.provider, (s) => { delete s.regras_pedido; s.regras_fiscais = r; });
+        report.push({ workspace_id: i.workspace_id, regras_fiscais: r.notas_lidas });
+      } catch (e) { await writeSettings(db, i.workspace_id, i.provider, (s) => { delete s.regras_pedido; s.regras_fiscais_erro = String(e).slice(0, 300); }); }
+    }
+    for (const i of list.filter((x) => x.provider === "bling" && (x.settings?.fiscal_diag_pedido || (x.settings?.fiscal_fila ?? []).length))) {
+      try {
+        const diag = i.settings?.fiscal_diag_pedido ? await diagnosticoFiscal() : undefined;
+        const fila = (i.settings?.fiscal_fila ?? []) as string[];
+        const res = fila.length ? await processarFilaFiscal(db, i.workspace_id, fila) : undefined;
+        await writeSettings(db, i.workspace_id, i.provider, (s) => { delete s.fiscal_diag_pedido; s.fiscal_fila = []; if (diag) s.fiscal_diag = { ...diag, em: new Date().toISOString() }; if (res) s.fiscal_testes = { res, em: new Date().toISOString() }; });
+        report.push({ workspace_id: i.workspace_id, fiscal: { diag, res } });
+      } catch (e) { report.push({ workspace_id: i.workspace_id, fiscal_erro: String(e) }); }
+    }
     // Réguas de relacionamento (Mercado Livre): de hora em hora, só para as réguas ligadas no portal.
     for (const i of list.filter((x) => x.provider === "mercadolivre" && (!x.settings?.reguas?.fim || Date.now() - new Date(x.settings.reguas.fim).getTime() > HOURLY_MS))) {
       try {
@@ -238,6 +257,11 @@ Deno.serve(handler(async (req) => {
       const cfg = await configFiscal(db, ws);
       const { data: prods } = await db.from("produtos").select("id,ncm,origem").eq("workspace_id", ws);
       return json({ ...statusFiscal(cfg), config: cfg, produtos: (prods ?? []).length, sem_ncm: (prods ?? []).filter((p) => !p.ncm).map((p) => p.id) });
+    }
+    case "fiscal_regras_bling": {
+      const r = await lerRegrasFiscaisBling(db, ws);
+      await writeSettings(db, ws, "bling", (s) => { s.regras_fiscais = r; });
+      return json(r);
     }
     case "fiscal_ler_produtos": return json(await detalhesFiscaisBling(db, ws, 150));
     case "fiscal_emitir": return json(await emitirNFe(db, ws, String(body.pedido ?? ""), user.email ?? user.id, body.producao === true));
