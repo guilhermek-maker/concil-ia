@@ -14,11 +14,19 @@ $regras = @{
 if (-not $regras.ContainsKey($Nome)) { Write-Host "Nome inválido. Use um destes: $($regras.Keys -join ', ')"; exit 1 }
 
 # Lê da área de transferência: copie a credencial na plataforma e rode o comando (não precisa colar nada).
+# Se a área de transferência tiver outra coisa, o script pede para colar o valor (digitação escondida).
 $valor = (Get-Clipboard | Out-String).Trim()
 $min, $max = $regras[$Nome]
-if ($valor.Length -lt $min -or $valor.Length -gt $max -or $valor -match '\s') {
-  Write-Host "O valor tem $($valor.Length) caracteres, mas $Nome costuma ter entre $min e $max, sem espaços. Parece que foi copiado o texto errado. Copie só o campo e tente de novo."
-  exit 1
+$invalido = { param($v) $v.Length -lt $min -or $v.Length -gt $max -or $v -match '\s' }
+if (& $invalido $valor) {
+  # A área de transferência tinha outra coisa (ex.: o próprio comando). Pede para colar aqui, sem mostrar na tela.
+  Write-Host "A área de transferência não tem um $Nome válido."
+  $seguro = Read-Host "Cole o valor aqui (Ctrl+V, depois Enter — não aparece na tela)" -AsSecureString
+  $valor = ([Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($seguro))).Trim()
+  if (& $invalido $valor) {
+    Write-Host "O valor tem $($valor.Length) caracteres, mas $Nome costuma ter entre $min e $max, sem espaços. Confira e tente de novo."
+    exit 1
+  }
 }
 
 & 'C:\Users\guilherme.klemann\.tools\supabase.exe' secrets set --project-ref olxapwaxmzqclitlylzv "$Nome=$valor" | Out-Null
