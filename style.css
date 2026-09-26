@@ -282,3 +282,5 @@ tr.sel td{background:#a88aff12}
 .c360head{display:flex;gap:14px;align-items:center}.c360av{width:54px;height:54px;border-radius:16px;background:#a88aff24;color:var(--accent);display:grid;place-items:center;font-weight:800;font-size:18px}
 .crmtable td{vertical-align:top}
 @media(max-width:1180px){.crm3{grid-template-columns:1fr}}
+
+.sidelogo{height:58px;width:auto;flex:none;filter:drop-shadow(0 2px 8px #0005)}body.light .sidelogo{filter:none}.complogo.login img{height:110px}
