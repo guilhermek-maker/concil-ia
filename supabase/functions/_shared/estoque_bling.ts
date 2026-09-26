@@ -36,6 +36,10 @@ export async function sincronizarEstoqueBling(db: SupabaseClient, ws: string, de
     const { error } = await db.from("produtos").upsert(uniq.slice(k, k + 200), { onConflict: "workspace_id,id" });
     if (error) throw error;
   }
+  // Foto do dia (histórico de saldo e custo por SKU): uma por dia, a última leitura do dia vale.
+  const hoje = new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10);
+  const fotos = uniq.filter((r) => r.saldo != null).map((r) => ({ workspace_id: ws, data: hoje, sku: r.id, saldo: r.saldo, custo: r.custo }));
+  for (let k = 0; k < fotos.length; k += 300) await db.from("estoque_fotos").upsert(fotos.slice(k, k + 300), { onConflict: "workspace_id,data,sku" });
   return { produtos: uniq.length, paginas, com_saldo: uniq.filter((r) => Number(r.saldo) > 0).length };
 }
 
